@@ -1,0 +1,46 @@
+{
+  "name": "policy-visualizer",
+  "private": true,
+  "license": "Apache-2.0",
+  "version": "1.0.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "description": "Policy Visualizer for AWS - a browser-based tool that turns IAM policy JSON into an interactive diagram, plain-English statement summaries, a permissions table, and PNG/PDF export. Runs fully client-side; no data leaves the browser.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint src e2e playwright.config.ts --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "start": "npm run dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "tsc -p e2e && playwright test"
+  },
+  "dependencies": {
+    "html-to-image": "^1.11.11",
+    "jspdf": "^4.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^14.0.0",
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.10",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.57.1",
+    "@vitejs/plugin-react": "^5.2.0",
+    "eslint": "^8.38.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.3.4",
+    "jsdom": "^22.1.0",
+    "typescript": "^5.6.2",
+    "vite": "^7.3.7",
+    "vitest": "^5.0.5"
+  }
+}
