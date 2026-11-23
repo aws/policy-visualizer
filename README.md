@@ -2,69 +2,105 @@
 
 > **Disclaimer:** This tool is sample code provided for educational purposes. It is not intended for production use without additional security review and testing. Its findings are a starting point and do not replace IAM Access Analyzer policy validation or your own review.
 
-A browser-based tool for reading AWS IAM policy JSON. Paste or upload a policy
-(or AWS CLI output such as `get-bucket-policy`, `get-role`, or
-`organizations describe-policy`, a CloudFormation template, or a URL-encoded
-policy) and it renders:
+Policy Visualizer for AWS draws an AWS IAM policy as a diagram and checks it
+for common mistakes. It runs entirely in your browser.
 
-- an interactive node diagram of the policy, its statements, and their actions,
-  resources, principals, and conditions;
-- plain-English summaries of each statement;
-- a permissions table;
-- findings from offline checks: public and cross-account principals,
-  wildcard and sensitive actions, `iam:PassRole` on any role, S3 actions that
-  don't match their bucket or object ARNs, `NotAction`/`NotResource`/
-  `NotPrincipal` with Allow, condition operator pitfalls (`ForAllValues`,
-  `ForAnyValue`, wildcards in `StringEquals`, `IfExists`), old or missing
-  `Version`, duplicate `Sid` values, and size limits. Findings adjust to the
-  policy type (identity, resource-based, trust, SCP/RCP, permissions
-  boundary). Trust policies and SCPs/RCPs are detected from exact wrapper
-  keys (`AssumeRolePolicyDocument`, and `Policy.Content` from
-  `organizations describe-policy`), identity, resource-based, and trust
-  policies from the contents, and a permissions boundary only when you pick
-  it. You can change the type. For SCPs, RCPs, and permissions boundaries
-  the "grants too much" checks are off, and the findings say so. Findings can be copied as
-  Markdown. These checks cover common mistakes only and do not replace IAM
-  Access Analyzer policy validation;
-- a comparison with a previous version of the policy: added and removed
-  statements, actions, resources, principals, conditions, and findings. A
-  statement counts as changed when anything in it other than its Sid
-  changes, so moving an action, principal, or condition to another
-  statement shows up even though the policy-wide lists stay the same;
-- a "Check access" view that shows whether this one policy allows an action
-  on a resource. It lists conditions and policy variables instead of
-  evaluating them and does not consider other policies;
-- an Optimize view that builds a narrower policy from the permissions you mark
-  as needed. Deny, `NotAction`/`NotResource`, and statements with more
-  action and resource pairs than the table shows are kept as written, and the
-  policy `Version` is kept as it was. Review the result, and validate it with
-  IAM Access Analyzer, before you use it;
-- PNG and PDF export of the diagram;
-- an optional redaction mode that replaces account IDs, resource names, Sids,
-  condition values, and unrecognized element names with placeholders across
-  the page: the diagram, tables, findings, comparison, Check access results,
-  Copy as Markdown, and PNG and PDF exports. It also hides the pasted policy
-  text and masks the Check access resource and caller fields. Kept as they
-  are: action names, service principals, Region names in condition values,
-  and condition keys (except tag names, as in `aws:ResourceTag/<key>`, and
-  web identity provider hosts, which are replaced). In an ARN, wildcards and
-  known policy variables are kept: documented `aws:` keys such as
-  `${aws:username}`, `saml:` keys, `sts:RoleSessionName` and
-  `sts:SourceIdentity`, and the keys of public identity providers. A tag key
-  inside a variable is replaced (`${aws:PrincipalTag/KEY-1}`), and a default
-  value follows the condition value rules, so `true`, `false`, short
-  numbers, Regions, and `<service>.amazonaws.com` names stay and anything
-  else is replaced. Any other `${...}` text is replaced, keeping its shape
-  (`${KEY-1:KEY-2}`, `${aws:KEY-3}`). The partition, service, and Region
-  fields are kept whatever they contain. The account field is replaced
-  unless it is `aws` (AWS managed policies), keeping only wildcards and
-  policy variables. The first part of the resource, which is normally its
-  type (`table`, `role`), is kept. For an ARN whose resource
-  starts with a name instead, such as an SNS subscription
-  (`...:<topic>:<id>`), that name is shown. Redaction changes only what is
-  shown: analysis uses the real policy, and the Optimize download contains
-  the real values. It is best effort, so check the output before you share
-  it.
+![Policy Visualizer showing the bundled sample policy](docs/screenshot.png)
+
+## What it does
+
+- Draws the policy, its statements, and their actions, resources, principals,
+  and conditions as a diagram you can pan, zoom, and collapse.
+- Describes each statement in plain English and lists its permissions in a
+  table.
+- Runs offline checks and reports findings. See [Findings](#findings).
+- Compares the policy with a previous version.
+- Shows whether this one policy allows an action on a resource (Check access).
+- Builds a narrower policy from the permissions you mark as needed (Optimize).
+- Exports the diagram as PNG or PDF, and copies findings as Markdown.
+- Optionally replaces account IDs, resource names, and other identifying
+  values with placeholders. See [Redaction](#redaction).
+
+You can paste or upload policy JSON, AWS CLI output such as
+`get-bucket-policy`, `get-role`, or `organizations describe-policy`, a
+CloudFormation template, or a URL-encoded policy.
+
+## Findings
+
+The checks look for:
+
+- public and cross-account principals;
+- wildcard and sensitive actions, and `iam:PassRole` on any role;
+- S3 actions that don't match their bucket or object ARNs;
+- `NotAction`, `NotResource`, and `NotPrincipal` with Allow;
+- condition operator pitfalls: `ForAllValues`, `ForAnyValue`, wildcards in
+  `StringEquals`, and `IfExists`;
+- an old or missing `Version`, duplicate `Sid` values, and size limits.
+
+Findings depend on the policy type: identity, resource-based, trust, SCP or
+RCP, or permissions boundary. Trust policies and SCPs/RCPs are detected from
+exact wrapper keys (`AssumeRolePolicyDocument`, and `Policy.Content` from
+`organizations describe-policy`), identity, resource-based, and trust
+policies from the contents, and a permissions boundary only when you pick it.
+You can change the type. For SCPs, RCPs, and permissions boundaries the
+"grants too much" checks are off, and the findings say so.
+
+These checks cover common mistakes only and do not replace IAM Access
+Analyzer policy validation.
+
+## Compare, Check access, and Optimize
+
+- **Compare** shows added and removed statements, actions, resources,
+  principals, conditions, and findings. A statement counts as changed when
+  anything in it other than its Sid changes, so moving an action, principal,
+  or condition to another statement shows up even though the policy-wide
+  lists stay the same.
+- **Check access** looks at this one policy only. It lists conditions and
+  policy variables instead of evaluating them.
+- **Optimize** keeps Deny statements, `NotAction`/`NotResource`, and
+  statements with more action and resource pairs than the table shows as
+  written, and keeps the policy `Version` as it was. Review the result, and
+  validate it with IAM Access Analyzer, before you use it.
+
+## Redaction
+
+Turn on **Redact names and IDs** before you take a screenshot or share an
+export. It replaces account IDs, resource names, Sids, condition values, and
+unrecognized element names with placeholders across the page: the diagram,
+tables, findings, comparison, Check access results, Copy as Markdown, and PNG
+and PDF exports. It also hides the pasted policy text and masks the Check
+access resource and caller fields.
+
+Kept as they are:
+
+- action names, service principals, and condition keys, except tag names (as
+  in `aws:ResourceTag/<key>`) and web identity provider hosts, which are
+  replaced;
+- Region names in condition values;
+- in an ARN, the partition, service, and Region fields, whatever they
+  contain, and the first part of the resource, which is normally its type
+  (`table`, `role`);
+- in an ARN, wildcards and known policy variables: documented `aws:` keys
+  such as `${aws:username}`, `saml:` keys, `sts:RoleSessionName` and
+  `sts:SourceIdentity`, and the keys of public identity providers.
+
+Replaced:
+
+- the ARN account field, unless it is `aws` (AWS managed policies), keeping
+  only wildcards and policy variables;
+- a tag key inside a variable (`${aws:PrincipalTag/KEY-1}`);
+- any other `${...}` text, keeping its shape (`${KEY-1:KEY-2}`,
+  `${aws:KEY-3}`).
+
+A variable's default value follows the condition value rules, so `true`,
+`false`, short numbers, Regions, and `<service>.amazonaws.com` names stay and
+anything else is replaced. For an ARN whose resource starts with a name
+instead of a type, such as an SNS subscription (`...:<topic>:<id>`), that
+name is shown.
+
+Redaction changes only what is shown: analysis uses the real policy, and the
+Optimize download contains the real values. It is best effort, so check the
+output before you share it.
 
 ## Runs entirely in your browser
 
@@ -85,7 +121,7 @@ npm run dev
 ```
 
 Then open the URL printed by Vite (default `http://localhost:3000`). Use
-**Load Sample Policy** to try it with the bundled `public/sample-policy.json`,
+**Load sample policy** to try it with the bundled `public/sample-policy.json`,
 or paste your own policy JSON.
 
 ## Build

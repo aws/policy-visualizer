@@ -38,7 +38,7 @@ const optimizeRows = (page: Page) => page.locator('table:has(th:text("Status")) 
 async function loadSample(page: Page) {
   await page.goto('./')
   await expect(page.getByText('Load a policy to see the visualization')).toBeVisible()
-  await page.getByRole('button', { name: 'Load Sample Policy' }).click()
+  await page.getByRole('button', { name: 'Load sample policy' }).click()
   await expect(page.getByText('Statement 1: Allow')).toBeVisible()
 }
 
@@ -86,8 +86,8 @@ function viewTransform(page: Page) {
   return page.locator('.graph-container svg > g').first().getAttribute('transform')
 }
 
-async function openAnalysisTab(page: Page, tab: 'Overview' | 'Human Readable' | 'Optimize' | 'Compare' | 'Check access') {
-  await page.locator('h3', { hasText: 'Policy Analysis' }).first().click()
+async function openAnalysisTab(page: Page, tab: 'Overview' | 'Human-readable' | 'Optimize' | 'Compare' | 'Check access') {
+  await page.locator('h3', { hasText: 'Policy analysis' }).first().click()
   await page.getByRole('button', { name: tab, exact: true }).click()
 }
 
@@ -177,10 +177,10 @@ test('scroll pans the diagram and Ctrl + scroll zooms', async ({ page }) => {
 test('analysis panel tabs and summary table', async ({ page }) => {
   await loadSample(page)
   await openAnalysisTab(page, 'Overview')
-  await expect(page.getByText('Wildcard Actions')).toBeVisible()
+  await expect(page.getByText('Wildcard actions')).toBeVisible()
 
-  await page.getByRole('button', { name: 'Human Readable' }).click()
-  await expect(page.getByText('Human Readable Translation')).toBeVisible()
+  await page.getByRole('button', { name: 'Human-readable' }).click()
+  await expect(page.getByText('Human-readable translation')).toBeVisible()
   const body = await page.locator('body').innerText()
   expect(body).toMatch(/perform get object in s3/i)
   expect(body).toMatch(/is denied from/i)
@@ -188,7 +188,7 @@ test('analysis panel tabs and summary table', async ({ page }) => {
   await page.getByRole('button', { name: 'Optimize' }).click()
   await expect(optimizeRows(page)).toHaveCount(9)
 
-  await page.locator('h3', { hasText: 'Policy Summary' }).click()
+  await page.locator('h3', { hasText: 'Policy summary' }).click()
   await expect(page.locator('table:has(th:text("Stmt")) tbody tr')).toHaveCount(9)
 })
 
@@ -227,7 +227,7 @@ test('NotAction statements are described as "everything except" and cannot be tr
     Statement: [{ Sid: 'AllExceptIam', Effect: 'Allow', NotAction: 'iam:*', Resource: '*' }],
   })
   await expect(page.getByText('NotAction', { exact: true })).toBeVisible()
-  await openAnalysisTab(page, 'Human Readable')
+  await openAnalysisTab(page, 'Human-readable')
   await expect(page.getByText(/is allowed to perform every action except/)).toBeVisible()
   await page.getByRole('button', { name: 'Optimize' }).click()
   await expect(optimizeRows(page).filter({ hasText: 'Kept as written' })).toHaveCount(1)
@@ -259,7 +259,7 @@ test('flags public access and cross-account principals', async ({ page }) => {
   await page.getByPlaceholder('12-digit account ID').fill('111122223333')
   await expect(findings.locator('li[data-severity="medium"]', { hasText: 'Cross-account access' })).toContainText('444455556666')
 
-  await page.getByRole('button', { name: 'Human Readable' }).click()
+  await page.getByRole('button', { name: 'Human-readable' }).click()
   await expect(page.getByText(/Anyone \(public access\)\s+is allowed to/)).toBeVisible()
 })
 
@@ -349,7 +349,7 @@ test('redaction covers the whole page, not only the diagram', async ({ page }) =
   }
   await expect(page.getByTestId('policy-diff')).toContainText('aws:SourceVpce: VALUE-1')
   await expectClean('Compare')
-  for (const tab of ['Overview', 'Human Readable', 'Optimize'] as const) {
+  for (const tab of ['Overview', 'Human-readable', 'Optimize'] as const) {
     await page.getByRole('button', { name: tab, exact: true }).click()
     await expectClean(tab)
   }
@@ -363,8 +363,8 @@ test('redaction covers the whole page, not only the diagram', async ({ page }) =
   await page.getByRole('button', { name: 'Check', exact: true }).click()
   await expect(page.getByTestId('access-result')).toBeVisible()
   await expectClean('Check access')
-  await page.locator('h3', { hasText: 'Policy Summary' }).click()
-  await expectClean('Policy Summary')
+  await page.locator('h3', { hasText: 'Policy summary' }).click()
+  await expectClean('Policy summary')
 
   // Turning redaction off restores the real values.
   await page.getByLabel('Redact names and IDs').uncheck()

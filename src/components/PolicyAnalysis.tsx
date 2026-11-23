@@ -15,7 +15,7 @@ import { download } from '../utils/export'
 type Tab = 'overview' | 'readable' | 'optimize' | 'compare' | 'check'
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'readable', label: 'Human Readable' },
+  { id: 'readable', label: 'Human-readable' },
   { id: 'optimize', label: 'Optimize' },
   { id: 'compare', label: 'Compare' },
   { id: 'check', label: 'Check access' },
@@ -222,7 +222,7 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
         }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <h3 style={{ margin: '0', color: '#fff', fontSize: '16px' }}>Policy Analysis</h3>
+        <h3 style={{ margin: '0', color: '#fff', fontSize: '16px' }}>Policy analysis</h3>
         <span style={{ color: '#9aa7c3', fontSize: '18px', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
           ▼
         </span>
@@ -239,7 +239,6 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
           <div style={{ padding: '16px' }}>
             {activeTab === 'overview' && (
               <>
-                <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '16px' }}>Policy Analysis</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ background: '#2d3748', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
                     <div style={{ fontSize: '12px', color: '#9aa7c3', marginBottom: '4px' }}>Statements</div>
@@ -254,15 +253,15 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
                     <div style={{ fontSize: '18px', color: '#f76363', fontWeight: 'bold' }}>{analysis.deny}</div>
                   </div>
                   <div style={{ background: '#2d3748', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: '#9aa7c3', marginBottom: '4px' }}>Wildcard Actions</div>
+                    <div style={{ fontSize: '12px', color: '#9aa7c3', marginBottom: '4px' }}>Wildcard actions</div>
                     <div style={{ fontSize: '18px', color: '#fff', fontWeight: 'bold' }}>{analysis.wildActions}</div>
                   </div>
                   <div style={{ background: '#2d3748', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: '#9aa7c3', marginBottom: '4px' }}>Wildcard Resources</div>
+                    <div style={{ fontSize: '12px', color: '#9aa7c3', marginBottom: '4px' }}>Wildcard resources</div>
                     <div style={{ fontSize: '18px', color: '#fff', fontWeight: 'bold' }}>{analysis.wildResources}</div>
                   </div>
                   <div style={{ background: '#2d3748', padding: '12px', borderRadius: '6px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '12px', color: '#9aa7c3', marginBottom: '4px' }}>No Conditions</div>
+                    <div style={{ fontSize: '12px', color: '#9aa7c3', marginBottom: '4px' }}>No conditions</div>
                     <div style={{ fontSize: '18px', color: '#fff', fontWeight: 'bold' }}>{analysis.noConditions}</div>
                   </div>
                 </div>
@@ -320,7 +319,7 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
 
             {activeTab === 'readable' && (
               <>
-                <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '16px' }}>Human Readable Translation</h3>
+                <h3 style={{ margin: '0 0 16px 0', color: '#fff', fontSize: '16px' }}>Human-readable translation</h3>
                 {isGuardrail(policyType) && (
                   <div role="note" style={{ fontSize: '12px', color: '#ffd9a8', marginBottom: '12px' }}>
                     {policyType === 'scp' ? 'SCPs and RCPs' : 'Permissions boundaries'} only set the maximum permissions.
@@ -354,7 +353,7 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
             {activeTab === 'optimize' && (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, color: '#fff', fontSize: '16px' }}>Policy Optimization</h3>
+                  <h3 style={{ margin: 0, color: '#fff', fontSize: '16px' }}>Policy optimization</h3>
                   <button
                     onClick={downloadOptimizedPolicy}
                     disabled={!permissions.some(p => p.status === 'needed')}
@@ -432,7 +431,7 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
                             >
                               <option value="unknown">Unknown</option>
                               <option value="needed">Needed</option>
-                              <option value="not-needed">Not Needed</option>
+                              <option value="not-needed">Not needed</option>
                             </select>
                             )}
                           </td>

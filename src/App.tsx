@@ -34,8 +34,8 @@ export default function App() {
       <div className="panel">
         <h3>Statements</h3>
         <div style={{ display:'flex', gap:8, marginBottom:8 }}>
-          <button className="btn secondary" onClick={()=>setCollapsed(Object.fromEntries(shown.statements.map(s => [s.id, true])))}>Collapse All</button>
-          <button className="btn secondary" onClick={()=>setCollapsed(Object.fromEntries(shown.statements.map(s => [s.id, false])))}>Expand All</button>
+          <button className="btn secondary" onClick={()=>setCollapsed(Object.fromEntries(shown.statements.map(s => [s.id, true])))}>Collapse all</button>
+          <button className="btn secondary" onClick={()=>setCollapsed(Object.fromEntries(shown.statements.map(s => [s.id, false])))}>Expand all</button>
         </div>
         {shown.statements.map((s, idx) => (
           <div key={s.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid #1c2442'}}>
