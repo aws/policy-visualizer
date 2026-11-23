@@ -519,7 +519,7 @@ const StatementNode = ({ data }: { data: Record<string, unknown> }) => {
   const color = effect === 'Allow' ? '#29c26b' : '#f76363'
   return (
     <div
-      style={{border:'1px solid #1c2442',borderRadius:12,padding:10,background:'#101a3a', width:NODE_WIDTH-20, minHeight:NODE_HEIGHT-20}}
+      style={{border:'1px solid #1c2442',borderRadius:12,padding:10,background:'#101a3a', boxSizing:'border-box', width:NODE_WIDTH, minHeight:NODE_HEIGHT}}
       title={sid ? `Sid: ${sid}` : undefined}
     >
       <div style={{fontSize:16, color:'#c6d3ff', fontWeight:600, marginBottom:4}}>{data.title as string}</div>
@@ -533,7 +533,7 @@ const ItemNode = ({ data }: { data: Record<string, unknown> }) => {
   const primary = ellipsizeMiddle(String(value), 34)
   const secondary = data.subtext as string | undefined
   return (
-    <div title={data.tooltip as string | undefined} style={{border:'1px solid #1c2442',borderRadius:12,padding:10,background:'#0c1533', width:NODE_WIDTH-20, minHeight:NODE_HEIGHT-20, display:'flex', alignItems:'center', gap:10}}>
+    <div title={data.tooltip as string | undefined} style={{border:'1px solid #1c2442',borderRadius:12,padding:10,background:'#0c1533', boxSizing:'border-box', width:NODE_WIDTH, minHeight:NODE_HEIGHT, display:'flex', alignItems:'center', gap:10}}>
       {BADGE_KINDS.includes(data.kind as string) && typeof value === 'string' && <ServiceBadge value={value} />}
       <div style={{ overflow:'hidden' }}>
         <div style={{fontSize:13, color:'#9aa7c3', marginBottom:2}}>{data.kind as string}</div>
@@ -545,7 +545,7 @@ const ItemNode = ({ data }: { data: Record<string, unknown> }) => {
 }
 
 const PolicyNode = ({ data }: { data: Record<string, unknown> }) => (
-  <div style={{border:'1px solid #1c2442',borderRadius:12,padding:12,background:'#0b1228', width:NODE_WIDTH-20, minHeight:NODE_HEIGHT-20}}>
+  <div style={{border:'1px solid #1c2442',borderRadius:12,padding:12,background:'#0b1228', boxSizing:'border-box', width:NODE_WIDTH, minHeight:NODE_HEIGHT}}>
     <div style={{fontSize:16, color:'#9cc2ff', fontWeight:600, marginBottom:4}}>{data.label as string}</div>
     <div style={{fontSize:13, color:'#9aa7c3'}}>Version: {(data.version as string | undefined) ?? '—'}</div>
   </div>
