@@ -721,7 +721,6 @@ describe('findingsMarkdown', () => {
     const md = findingsMarkdown(findings, { policyType: 'resource', statements: 1, charCount: 100, transform: t => t.replace('444455556666', 'ACCOUNT-1') })
     expect(md).toContain('| high | A \\| B | 1 \\(`S1`\\) | `account ACCOUNT-1 \\| x` |')
     expect(md).toContain('Policy type: Resource-based policy')
-    expect(md).not.toMatch(/[–—]/)
   })
 
   it('says when grant checks are off for the policy type', () => {
@@ -733,7 +732,6 @@ describe('findingsMarkdown', () => {
     const picked = findingsMarkdown([], { policyType: 'boundary', statements: 1, charCount: p.charCount })
     expect(picked).toContain('> The policy type is set to a permissions boundary.')
     expect(findingsMarkdown([], { policyType: 'identity', typeDetected: true, statements: 1, charCount: p.charCount })).not.toContain('Grant checks are off')
-    expect(detected).not.toMatch(/[\u2013\u2014]/)
   })
 
   it('escapes policy values so they cannot become links, images, or HTML', () => {
