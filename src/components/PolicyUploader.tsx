@@ -97,7 +97,7 @@ export default function PolicyUploader({ onParsed, redacted = false }: { onParse
 
   return (
     <div className="panel">
-      <h3>Load Policy JSON</h3>
+      <h3>Load policy JSON</h3>
       <input type="file" accept=".json,.txt" onChange={onFile} />
       <div style={{height:8}}/>
       {redacted
@@ -108,7 +108,7 @@ export default function PolicyUploader({ onParsed, redacted = false }: { onParse
         <button className="btn" onClick={()=>handleParse(text)}>Parse</button>
         <button className="btn secondary" onClick={()=>{ setText(''); onParsed(null); setError(null); setSource(null) }}>Clear</button>
         <button className='btn secondary' onClick={loadSample} disabled={loading}>
-          {loading ? 'Loading...' : 'Load Sample Policy'}
+          {loading ? 'Loading...' : 'Load sample policy'}
         </button>
       </div>
 

@@ -26,7 +26,7 @@ export default function SummaryTable({ parsed }: { parsed: ParsedPolicy | null }
         }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <h3 style={{ margin: '0', color: '#fff', fontSize: '16px' }}>Policy Summary</h3>
+        <h3 style={{ margin: '0', color: '#fff', fontSize: '16px' }}>Policy summary</h3>
         <span style={{ color: '#9aa7c3', fontSize: '18px', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
           ▼
         </span>

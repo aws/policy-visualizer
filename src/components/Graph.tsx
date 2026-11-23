@@ -505,6 +505,6 @@ const ItemNode = ({ data }: { data: Record<string, unknown> }) => {
 const PolicyNode = ({ data }: { data: Record<string, unknown> }) => (
   <div style={{border:'1px solid #1c2442',borderRadius:12,padding:12,background:'#0b1228', boxSizing:'border-box', width:NODE_WIDTH, minHeight:NODE_HEIGHT}}>
     <div style={{fontSize:16, color:'#9cc2ff', fontWeight:600, marginBottom:4}}>{data.label as string}</div>
-    <div style={{fontSize:13, color:'#9aa7c3'}}>Version: {(data.version as string | undefined) ?? '—'}</div>
+    <div style={{fontSize:13, color:'#9aa7c3'}}>Version: {(data.version as string | undefined) ?? 'not set (2008-10-17 applies)'}</div>
   </div>
 )

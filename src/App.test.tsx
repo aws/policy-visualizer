@@ -20,7 +20,7 @@ describe('App', () => {
 
   it('renders the policy upload controls', () => {
     render(<App />)
-    expect(screen.getByText('Load Policy JSON')).toBeInTheDocument()
+    expect(screen.getByText('Load policy JSON')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Parse/i })).toBeInTheDocument()
   })
 })

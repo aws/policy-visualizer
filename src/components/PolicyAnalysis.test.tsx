@@ -9,19 +9,19 @@ import { loadPolicyText } from '../policy/input'
 import { Redactor, redactPolicy } from '../policy/redact'
 
 // Hostile markup placed in policy values by a pasted policy. It must render
-// as literal text in the Human Readable tab, never as elements.
+// as literal text in the Human-readable tab, never as elements.
 const PAYLOAD = '<img src=x onerror=alert(1)>'
 
 function renderHumanReadable(policy: unknown) {
   const parsed = parsePolicy(policy)
   const view = render(<PolicyAnalysis parsed={parsed} />)
-  // Expand the collapsed panel, then open the Human Readable tab.
-  fireEvent.click(screen.getByText('Policy Analysis'))
-  fireEvent.click(screen.getByRole('button', { name: 'Human Readable' }))
+  // Expand the collapsed panel, then open the Human-readable tab.
+  fireEvent.click(screen.getByText('Policy analysis'))
+  fireEvent.click(screen.getByRole('button', { name: 'Human-readable' }))
   return view
 }
 
-describe('PolicyAnalysis Human Readable tab', () => {
+describe('PolicyAnalysis Human-readable tab', () => {
   it('renders hostile markup in resources and conditions as text, not elements', () => {
     const { container } = renderHumanReadable({
       Version: '2012-10-17',
@@ -98,7 +98,7 @@ describe('PolicyAnalysis with redaction', () => {
     const parsed = parsePolicy(policy)
     const redactor = redact ? new Redactor() : null
     const view = render(<PolicyAnalysis parsed={parsed} displayParsed={redactor ? redactPolicy(parsed, redactor) : null} redactor={redactor} />)
-    fireEvent.click(screen.getByText('Policy Analysis'))
+    fireEvent.click(screen.getByText('Policy analysis'))
     fireEvent.click(screen.getByRole('button', { name: tab }))
     return view
   }
@@ -125,7 +125,7 @@ describe('PolicyAnalysis Optimize tab', () => {
     render(<PolicyAnalysis parsed={parsePolicy({ Statement: [
       { Effect: 'Allow', Action: Array.from({ length: 50 }, (_, i) => `s3:A${i}`), Resource: Array.from({ length: 50 }, (_, i) => `arn:aws:s3:::example-bucket/\${aws:username}/${i}`) },
     ] })} />)
-    fireEvent.click(screen.getByText('Policy Analysis'))
+    fireEvent.click(screen.getByText('Policy analysis'))
     fireEvent.click(screen.getByRole('button', { name: 'Optimize' }))
     expect(screen.getByTestId('optimize-version-warning')).toHaveTextContent('no Version (treated as 2008-10-17)')
     expect(screen.getByText(/Showing the first 2,000 of 2,500 rows/)).toBeInTheDocument()
@@ -137,7 +137,7 @@ describe('PolicyAnalysis guardrail notice', () => {
 
   it('says grant checks are off for a type detected from the wrapper, and for a type the user picks', () => {
     render(<PolicyAnalysis parsed={loadPolicyText(JSON.stringify({ Policy: { Content: JSON.stringify(fullAccess) } }))} />)
-    fireEvent.click(screen.getByText('Policy Analysis'))
+    fireEvent.click(screen.getByText('Policy analysis'))
     expect(screen.getByTestId('guardrail-notice')).toHaveTextContent('detected as an SCP or RCP from the input wrapper (Policy.Content')
     expect(screen.getByTestId('guardrail-notice')).toHaveTextContent('Grant checks are off for this type')
     const select = screen.getByDisplayValue('Detected: SCP or RCP (Organizations)')
@@ -151,7 +151,7 @@ describe('PolicyAnalysis guardrail notice', () => {
 
   it('shows no notice for other policy types', () => {
     render(<PolicyAnalysis parsed={parsePolicy(fullAccess)} />)
-    fireEvent.click(screen.getByText('Policy Analysis'))
+    fireEvent.click(screen.getByText('Policy analysis'))
     expect(screen.queryByTestId('guardrail-notice')).toBeNull()
   })
 })
