@@ -36,7 +36,7 @@ function code(t: string): string {
   const longest = Math.max(0, ...(v.match(/`+/g) ?? []).map(run => run.length))
   const fence = '`'.repeat(longest + 1)
   const pad = /^[` ]|[` ]$/.test(v) ? ' ' : ''
-  return `${fence}${pad}${v.replace(/\|/g, '\\|')}${pad}${fence}`
+  return `${fence}${pad}${v.replace(/(\\*)\|/g, (_, b) => `${b}${b}\\|`)}${pad}${fence}`
 }
 
 export function findingsMarkdown(findings: Finding[], o: MarkdownOptions): string {

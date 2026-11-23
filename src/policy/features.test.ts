@@ -769,6 +769,14 @@ describe('findingsMarkdown', () => {
     expect(md).toContain('| low | T | 2 | ```two `` ticks``` |')
   })
 
+  it('keeps a backslash before a pipe from ending the table cell', () => {
+    // Synthetic values. Some renderers (micromark) read "\\" as one escape, so the "|" after it ends the cell.
+    const cells = (row: string) => row.replace(/\\[\\|]/g, '  ').split('|').length - 2
+    const findings = [{ code: 'X', severity: 'low' as const, title: 'T', detail: 'a\\| [x](https://example.invalid) b\\\\|c', statement: 1, sid: 'S\\|1' }]
+    const row = findingsMarkdown(findings, { policyType: 'identity', statements: 1, charCount: 10 }).split('\n').find(l => l.startsWith('| low')) as string
+    expect(cells(row)).toBe(4)
+  })
+
   it('says so when there are no findings', () => {
     expect(findingsMarkdown([], { policyType: 'identity', statements: 1, charCount: 10, sizeLimit: 6144 }))
       .toContain('No issues found by the offline checks.')
