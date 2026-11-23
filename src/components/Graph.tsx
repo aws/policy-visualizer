@@ -18,23 +18,17 @@ interface Edge {
   target: string
 }
 
-// Item kinds whose values are actions or ARNs, and so carry a service badge.
 const BADGE_KINDS = ['Action', 'NotAction', 'Resource', 'NotResource']
 
 const NODE_WIDTH = 340
 const NODE_HEIGHT = 80
 const FIT_MARGIN = 24
-// Fit-to-view never shrinks below this, so text stays readable. Graphs too
-// tall to fit at this zoom are fitted to the width and shown from the top;
-// scroll or drag to see the rest.
+// Fit never zooms out past this, so text stays readable; taller graphs fit the width.
 const MIN_FIT_ZOOM = 0.75
-// Zoom controls sit in the bottom-left corner. Fitting keeps the diagram to
-// the right of them: 10px inset + 32px buttons + 10px clearance.
+// Room for the zoom controls: 10px inset + 32px buttons + 10px gap.
 const CONTROLS_GUTTER = 52
-// Mouse movement, in pixels, beyond which a press counts as a pan.
 const DRAG_THRESHOLD = 3
 
-// Bounding box of all laid-out nodes in graph coordinates.
 function graphBounds(nodes: Node[]) {
   if (!nodes.length) return null
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -54,7 +48,6 @@ function ellipsizeMiddle(str: string, max = 36) {
   return `${str.slice(0, half)}…${str.slice(-half)}`
 }
 
-// Center-symmetric layout algorithm with intelligent spacing
 function layout(nodes: Node[], edges: Edge[]) {
   const levels: { [key: number]: Node[] } = {}
   const nodeMap: { [key: string]: Node } = {}
@@ -66,46 +59,38 @@ function layout(nodes: Node[], edges: Edge[]) {
     levels[level].push(node)
   })
 
-  // Position nodes by level with intelligent spacing
   Object.keys(levels).forEach(levelKey => {
     const level = parseInt(levelKey)
     const levelNodes = levels[level]
     
     let spacing: number
     
-    if (level === 1) { // Statement level - consider child nodes
+    if (level === 1) {
       const statementNodes = levelNodes
       const childNodes = levels[2] || []
       
-      // Calculate average children per statement
       const avgChildrenPerStatement = childNodes.length / Math.max(statementNodes.length, 1)
       
-      // Adjust spacing based on both statement count and child density
       if (statementNodes.length <= 2) {
-        // For 1-2 statements, increase spacing more if they have many children
         if (avgChildrenPerStatement > 6) {
-          spacing = NODE_HEIGHT + 180 // Extra space for statements with many children
+          spacing = NODE_HEIGHT + 180
         } else if (avgChildrenPerStatement > 3) {
-          spacing = NODE_HEIGHT + 150 // More space for moderate children
+          spacing = NODE_HEIGHT + 150
         } else {
-          spacing = NODE_HEIGHT + 120 // Standard extra space for few statements
+          spacing = NODE_HEIGHT + 120
         }
       } else if (statementNodes.length <= 4) {
-        // For 3-4 statements, moderate spacing adjustment
         if (avgChildrenPerStatement > 4) {
           spacing = NODE_HEIGHT + 100
         } else {
           spacing = NODE_HEIGHT + 80
         }
       } else if (statementNodes.length <= 6) {
-        // For 5-6 statements, less spacing adjustment
         spacing = NODE_HEIGHT + 60
       } else {
-        // For many statements, compact spacing
         spacing = NODE_HEIGHT + 40
       }
     } else {
-      // For other levels (policy and items), use simpler spacing
       if (levelNodes.length <= 2) {
         spacing = NODE_HEIGHT + 100
       } else if (levelNodes.length <= 4) {
@@ -117,13 +102,12 @@ function layout(nodes: Node[], edges: Edge[]) {
       }
     }
     
-    // Calculate total height needed for this level
     const totalHeight = (levelNodes.length - 1) * spacing
-    const startY = 300 - totalHeight / 2 // Center around y=300
+    const startY = 300 - totalHeight / 2
 
     levelNodes.forEach((node, index) => {
       node.position = {
-        x: level * (NODE_WIDTH + 120) + 100, // Horizontal spacing
+        x: level * (NODE_WIDTH + 120) + 100,
         y: startY + index * spacing
       }
     })
@@ -137,17 +121,14 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  // Where the mouse went down, and whether it has since moved far enough to
-  // count as a drag. A drag that ends on a statement node must not toggle it.
+  // A drag that ends on a statement node must not toggle it.
   const downPos = useRef({ x: 0, y: 0 })
   const dragged = useRef(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const fittedPolicy = useRef<ParsedPolicy | null>(null)
 
-  // Scale and center the view so the whole graph is visible in the container.
-  // Returns false when the container has no size yet, so the caller can
-  // retry once it is laid out.
+  // Returns false when the container has no size yet, so the caller can retry.
   const fitView = useCallback((ns: Node[]): boolean => {
     const el = containerRef.current
     const bounds = graphBounds(ns)
@@ -155,11 +136,9 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
     const cw = el.clientWidth
     const ch = el.clientHeight
     if (!cw || !ch) return false
-    // Usable width runs from the controls gutter to the right margin.
     const usableW = cw - CONTROLS_GUTTER - FIT_MARGIN
     const fitWidth = usableW / bounds.width
     const fitHeight = (ch - 2 * FIT_MARGIN) / bounds.height
-    // Center horizontally within the usable width, never left of the gutter.
     const panX = (z: number) =>
       CONTROLS_GUTTER + Math.max(0, (usableW - bounds.width * z) / 2) - bounds.minX * z
     const scale = Math.min(fitWidth, fitHeight, 1)
@@ -168,16 +147,13 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
       setPan({ x: panX(scale), y: (ch - bounds.height * scale) / 2 - bounds.minY * scale })
       return true
     }
-    // Too big to fit readably: fit the width (within the floor) and start at the top.
     const z = Math.max(MIN_FIT_ZOOM, Math.min(fitWidth, 1))
     setZoom(z)
     setPan({ x: panX(z), y: FIT_MARGIN - bounds.minY * z })
     return true
   }, [])
 
-  // Nodes and edges are derived from props during render, so the diagram
-  // never shows a previous policy for a frame (for example, real values for
-  // one render after redaction is switched on).
+  // Derived during render, so no frame shows stale (possibly unredacted) values.
   const { nodes, edges } = useMemo(() => {
     if (!parsed) return { nodes: [] as Node[], edges: [] as Edge[] }
     const ns: Node[] = []
@@ -203,8 +179,7 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
       if (collapsed[st.id]) return
       
       const items: {id:string, kind:string, value:string, tip:string, subtext?:string}[] = []
-      // NotAction/NotResource/NotPrincipal mean "everything except these", so
-      // label them distinctly rather than as plain Action/Resource/Principal.
+      // Not* elements mean "everything except these", so label them distinctly.
       const actionKind = st.notAction ? 'NotAction' : 'Action'
       const resourceKind = st.notResource ? 'NotResource' : 'Resource'
       const principalKind = st.notPrincipal ? 'NotPrincipal' : 'Principal'
@@ -229,15 +204,11 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
     return { nodes: laid, edges: laidEdges }
   }, [parsed, collapsed])
 
-  // Edges look nodes up by id on every render; a Map keeps that linear.
   const nodeById = useMemo(() => new Map(nodes.map(n => [n.id, n])), [nodes])
 
-  // Fit the view when a new policy is loaded. Collapsing or expanding a
-  // statement keeps the user's pan and zoom; the home button refits.
-  // The container only exists while a policy is shown.
+  // Refit only when a new policy loads; collapsing a statement keeps the user's pan and zoom.
   const hasGraph = !!parsed
-  // Bumped when the container is resized, so a fit that ran before layout
-  // (container size 0) is retried.
+  // Bumped on resize, so a fit that ran before layout is retried.
   const [layoutTick, setLayoutTick] = useState(0)
   useEffect(() => {
     const el = containerRef.current
@@ -253,9 +224,8 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
     }
   }, [parsed, nodes, fitView, layoutTick])
 
-  // Scroll pans; Ctrl/Cmd + scroll, or a trackpad pinch (reported with
-  // ctrlKey), zooms. React's onWheel is passive and can't stop the browser
-  // from also zooming the whole page, so this is a native listener.
+  // Scroll pans; Ctrl/Cmd + scroll or a pinch zooms. A native listener, because React's
+  // passive onWheel can't stop the browser from zooming the page.
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -272,7 +242,6 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
     return () => el.removeEventListener('wheel', onWheel)
   }, [hasGraph])
 
-  // Handle mouse events for pan and zoom
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true)
     dragged.current = false
@@ -303,17 +272,13 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
     }
   }
 
-  // Create curved path between specific connection points
   const createCurvedPath = (sourcePos: {x: number, y: number}, targetPos: {x: number, y: number}) => {
-    // Source connection point (right side of source node)
     const sourceX = sourcePos.x + NODE_WIDTH
     const sourceY = sourcePos.y + NODE_HEIGHT/2
     
-    // Target connection point (left side of target node)
     const targetX = targetPos.x
     const targetY = targetPos.y + NODE_HEIGHT/2
     
-    // Create smooth curve
     const dx = targetX - sourceX
     const controlX1 = sourceX + dx * 0.5
     const controlX2 = targetX - dx * 0.5
@@ -321,7 +286,6 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
     return `M ${sourceX} ${sourceY} C ${controlX1} ${sourceY}, ${controlX2} ${targetY}, ${targetX} ${targetY}`
   }
 
-  // Get connection points for nodes
   const getConnectionPoints = () => {
     const points: Array<{x: number, y: number, type: 'source' | 'target'}> = []
     
@@ -330,14 +294,12 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
       const targetNode = nodeById.get(edge.target)
       
       if (sourceNode && targetNode) {
-        // Source connection point (right side)
         points.push({
           x: sourceNode.position.x + NODE_WIDTH,
           y: sourceNode.position.y + NODE_HEIGHT/2,
           type: 'source'
         })
         
-        // Target connection point (left side)
         points.push({
           x: targetNode.position.x,
           y: targetNode.position.y + NODE_HEIGHT/2,
@@ -398,7 +360,6 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
         onMouseLeave={handleMouseUp}
       >
         <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-          {/* Render edges */}
           {edges.map(edge => {
             const sourceNode = nodeById.get(edge.source)
             const targetNode = nodeById.get(edge.target)
@@ -416,7 +377,6 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
             )
           })}
           
-          {/* Render connection points */}
           {getConnectionPoints().map((point, index) => (
             <circle
               key={`connection-${index}`}
@@ -430,7 +390,6 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
             />
           ))}
           
-          {/* Render nodes */}
           {nodes.map(node => {
             const NodeComponent = node.type === 'policy' ? PolicyNode : 
                                  node.type === 'statement' ? StatementNode : ItemNode
@@ -448,7 +407,6 @@ export default function Graph({ parsed, collapsed, onToggleStatement }: { parsed
         </g>
       </svg>
       
-      {/* Zoom controls */}
       <div data-testid="zoom-controls" style={{
         position: 'absolute',
         left: '10px',

@@ -6,30 +6,21 @@ import { guardrailNotice, POLICY_TYPES, type PolicyType } from './policyType'
 
 export interface MarkdownOptions {
   policyType: PolicyType
-  // True when policyType came from detection, not the user's choice.
   typeDetected?: boolean
   statements: number
   charCount: number
   sizeLimit?: number
-  // Applied to every finding's text, e.g. Redactor.text when redacting.
   transform?: (text: string) => string
 }
 
 // Table cells can't hold line breaks.
 const flat = (t: string) => t.replace(/\r\n?|\n/g, ' ')
 
-// Text this tool wrote, such as finding titles: backslash-escape every
-// Markdown and HTML punctuation character.
+// Our own text, such as finding titles: escape every Markdown and HTML punctuation character.
 const escaped = (t: string) => flat(t).replace(/[\\`*_{}[\]()<>#+!|~&]/g, '\\$&')
 
-// Finding details and Sids include values from the policy, which whoever
-// wrote the policy controls. Escaping punctuation stops "[text](url)" links
-// and "<img>" HTML, but GitHub would still autolink a bare URL or www. host
-// and notify an @mention. A code span turns all of those off at once. Its
-// fence is one backtick longer than the longest run of backticks inside,
-// with a space of padding when the value starts or ends with a backtick or
-// space (one space is stripped from each end). "|" still ends a table cell
-// inside a code span, so it is escaped there too.
+// Policy values go in code spans, since escaping alone still lets GitHub autolink URLs and
+// @mentions. "|" still ends a table cell inside a code span, so it is escaped too.
 function code(t: string): string {
   const v = flat(t)
   if (!v) return ''

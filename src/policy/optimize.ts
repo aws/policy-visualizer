@@ -6,7 +6,6 @@ import type { ParsedPolicy, ParsedStatement, Statement } from './types'
 // Tables render at most this many rows; more would make the page sluggish.
 export const MAX_TABLE_ROWS = 2000
 
-// Table placeholder for a statement with no Action or no Resource list.
 export const NONE = '(none)'
 
 export type PermissionStatus = 'needed' | 'not-needed' | 'unknown'
@@ -18,26 +17,19 @@ export interface PermissionRow {
   resource: string
   effect: string
   status: PermissionStatus
-  // Set when the statement can't be narrowed safely. The statement is then
-  // written to the optimized policy exactly as it was, and this explains why.
+  // Set when the statement can't be narrowed safely; it is then copied as written.
   locked?: string
 }
 
-// Table rows for one statement: one per action and resource pair, with a
-// missing list counted as one "(none)" entry.
 export function pairCount(st: ParsedStatement): number {
   return Math.max(st.actions.length, 1) * Math.max(st.resources.length, 1)
 }
 
-// Total rows for the whole policy, by arithmetic. Building every row first
-// would take actions x resources memory, which a crafted policy can push to
-// tens of millions of rows within the input size limit.
+// Counted, not built: actions x resources can reach tens of millions of rows.
 export function permissionRowCount(parsed: ParsedPolicy): number {
   return parsed.statements.reduce((n, st) => n + pairCount(st), 0)
 }
 
-// Why a statement must be kept exactly as written, or undefined if it is safe
-// to narrow by dropping actions and resources.
 export function lockReason(st: ParsedStatement): string | undefined {
   if (st.effect === 'Deny') {
     return 'Deny statements are kept as written. Removing parts of a Deny would grant more access.'
@@ -55,14 +47,12 @@ export function lockReason(st: ParsedStatement): string | undefined {
   return undefined
 }
 
-// The first `limit` rows only; use permissionRowCount for the total.
 export function buildPermissionRows(parsed: ParsedPolicy, limit = MAX_TABLE_ROWS): PermissionRow[] {
   const rows: PermissionRow[] = []
   parsed.statements.forEach((st, idx) => {
     if (rows.length >= limit) return
     const locked = lockReason(st)
-    // A missing list is shown as "(none)", never as "*", which would read
-    // as a wildcard grant.
+    // "(none)", never "*", which would read as a wildcard grant.
     const actions = st.actions.length ? st.actions : [NONE]
     const resources = st.resources.length ? st.resources : [NONE]
     for (const action of actions) {
@@ -91,7 +81,6 @@ export interface SummaryRow {
   condition: string
 }
 
-// Rows for the Policy Summary table: the first `limit` only, plus the total.
 export function buildSummaryRows(parsed: ParsedPolicy, limit = MAX_TABLE_ROWS): { rows: SummaryRow[]; total: number } {
   const rows: SummaryRow[] = []
   for (const s of parsed.statements) {
@@ -119,17 +108,8 @@ function oneOrMany(values: string[]): string | string[] {
   return values.length === 1 ? values[0] : values
 }
 
-// Build a narrowed policy from the rows the user marked "needed".
-//
-// The result never grants more than the original:
-// - Narrowable Allow statements keep only the actions and resources from
-//   rows marked "needed". Every other element (Sid, Principal, NotPrincipal,
-//   Condition) is copied unchanged. Statements with nothing needed are dropped.
-// - Locked statements (Deny, NotAction/NotResource, no Action or Resource
-//   list, too many rows to show) are copied exactly as written.
-// - Version is copied as written, and left out if the input had none. A
-//   missing Version means 2008-10-17, where ${aws:username} is plain text;
-//   adding 2012-10-17 would turn it into a variable and match more.
+// The result never grants more than the original. Version is kept as written: a missing
+// Version means 2008-10-17, and adding 2012-10-17 would make ${aws:username} a variable.
 export function buildOptimizedPolicy(parsed: ParsedPolicy, rows: PermissionRow[]): { Version?: string; Id?: string; Statement: Statement[] } {
   const statements: Statement[] = []
   for (const st of parsed.statements) {
@@ -150,9 +130,6 @@ export function buildOptimizedPolicy(parsed: ParsedPolicy, rows: PermissionRow[]
   }
 }
 
-// Shown in the Optimize view when the policy's Version makes "${...}" plain
-// text. The optimized policy keeps that Version, so it matches the same
-// resources; switching to 2012-10-17 is the user's call.
 export function versionWarning(parsed: ParsedPolicy): string | undefined {
   if (parsed.version !== undefined && parsed.version !== '2008-10-17') return undefined
   if (!parsed.statements.some(s => JSON.stringify(s.raw).includes('${'))) return undefined

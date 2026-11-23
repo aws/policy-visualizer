@@ -5,11 +5,6 @@ import type { ParsedPolicy, ParsedStatement, Statement } from './types'
 import { detectPolicyType, isGuardrail, sizeLimit, type PolicyType } from './policyType'
 import { stripVariables, wildcardMatch } from './evaluate'
 
-// Does a Resource pattern cover any IAM role (in some account)? "*" does,
-// and so do patterns like arn:aws:iam::*:role/* or
-// arn:aws:iam::444455556666:role/*. Tested by matching role ARNs with
-// made-up names and a path, using the pattern's own partition and, when it
-// names one, its own account.
 function coversAnyRole(r: string): boolean {
   if (r === '*') return true
   const partition = /^arn:([a-z-]+):/.exec(r)?.[1] ?? 'aws'
@@ -19,26 +14,15 @@ function coversAnyRole(r: string): boolean {
   return probes.every(p => wildcardMatch(r, p))
 }
 
-// Does a NotResource pattern exclude every role in every account? Only then
-// does a NotResource statement leave no role to pass: excluding one role, or
-// the roles of one account, still leaves almost every role covered. The
-// probes share no characters beyond what every role ARN has ("arn:",
-// partition, ":iam::", ":role/"): the two accounts have no digit in common
-// and the names none with each other. So a pattern that matches all of
-// them has no literal that a real role ARN could lack, and a name such as
-// "x" keeps "role/??*" from counting. Roles are probed in every partition
-// in `partitions` (see policyPartitions), never only the pattern's own, so
-// excluding the roles of arn:aws-cn does not count as excluding those of
-// arn:aws.
+// Excluding one role, or one account's roles, still leaves almost every role to pass. The probe
+// ARNs share nothing beyond what every role ARN has, and are tried in every partition.
 function excludesEveryRole(r: string, partitions: string[]): boolean {
   if (r === '*') return true
   return partitions.every(partition => ['111122223333', '444455556666'].every(account =>
     ['x', 'Q7/k', '_+=,.@-'].every(name => wildcardMatch(r, `arn:${partition}:iam::${account}:role/${name}`))))
 }
 
-// The partitions whose roles a NotResource must exclude: "aws", plus every
-// partition an ARN in the policy names. A genuine aws-cn policy is then
-// also tested against aws roles, which can only add a finding.
+// Always includes "aws", which can only add findings.
 function policyPartitions(parsed: ParsedPolicy): string[] {
   const out = new Set(['aws'])
   for (const st of parsed.statements) {
@@ -50,49 +34,36 @@ function policyPartitions(parsed: ParsedPolicy): string[] {
   return [...out]
 }
 
-// Whether a statement's Resource or NotResource covers any role. A
-// NotResource covers none only if, for each partition, one of its entries
-// excludes every role there. Entries are not combined within a partition,
-// so a list that matches each probe with a different literal still counts.
 const anyRoleIn = (st: ParsedStatement, partitions: string[]) =>
   st.notResource
     ? !partitions.every(p => st.resources.some(r => excludesEveryRole(r, [p])))
     : st.resources.some(coversAnyRole)
 
-// An operation part made only of "*" and "?" with at least one "*" (svc:*,
-// svc:**, svc:?*, svc:*?) matches every action name at least as long as its
-// "?" count, which is every action in the service in practice. Character
-// checks only, so the cost is linear.
+// svc:*, svc:**, svc:?* and similar match every action in the service in practice.
 const allWild = (v: string) => v.includes('*') && /^[*?]+$/.test(v)
 function isServiceWildcard(action: string): boolean {
   const colon = action.indexOf(':')
   return colon > 0 && /^[a-z0-9-]+$/i.test(action.slice(0, colon)) && allWild(action.slice(colon + 1))
 }
-// Action "*" and spellings that match every action in every service: "**",
-// "*?", or "*:*".
 function isAllActions(action: string): boolean {
   if (allWild(action)) return true
   const colon = action.indexOf(':')
   return colon > 0 && allWild(action.slice(0, colon)) && allWild(action.slice(colon + 1))
 }
 
-// An ARN that names no account, Region, or specific resource, such as
-// arn:aws:s3:::* or arn:aws:dynamodb:*:*:table/*, covers every resource of
-// that service.
+// An ARN with no account, Region, or resource name (arn:aws:s3:::*) covers the whole service.
 function serviceWide(r: string): string | null {
   const m = /^arn:[^:]+:([^:]+):([^:]*):([^:]*):(.+)$/.exec(r)
   if (!m) return null
   const [, service, region, account, resource] = m
   const open = (v: string) => v === '' || v === '*'
   if (!open(region) || !open(account)) return null
-  // S3 ARNs have no resource type: "bucket/*" names one bucket. Elsewhere
-  // "type/*" (e.g. table/*) means every resource of that type.
+  // S3 ARNs have no resource type, so "bucket/*" is one bucket; elsewhere "table/*" is every table.
   const all = service === 's3' ? /^\*(\/\*)?$/ : /^(\*|[A-Za-z-]+[/:]\*)$/
   return all.test(resource) ? service : null
 }
 
-// Offline checks for common IAM policy risks and mistakes. Everything here
-// runs locally on the parsed policy; nothing is sent anywhere.
+// Offline checks; nothing is sent anywhere.
 
 export type Severity = 'high' | 'medium' | 'low' | 'info'
 
@@ -107,10 +78,8 @@ export interface Finding {
 }
 
 export interface AnalyzeOptions {
-  // The account the policy belongs to. When set, principals from any other
-  // account are reported as cross-account access.
+  // When set, principals from other accounts are reported as cross-account.
   accountId?: string
-  // Defaults to detectPolicyType().
   policyType?: PolicyType
 }
 
@@ -120,8 +89,7 @@ const SEVERITY_ORDER: Severity[] = ['high', 'medium', 'low', 'info']
 // Lowercase: IAM matches action names case-insensitively.
 const SENSITIVE_EXACT = new Set(['s3:putbucketpolicy', 's3:deletebucketpolicy', 's3:putbucketacl', 's3:putobjectacl'])
 
-// IAM and Organizations actions that change things (not Get/List/Describe),
-// any KMS action (keys protect data), and a few S3 access-control writes.
+// Mutating IAM and Organizations actions, any KMS action, and some S3 access-control writes.
 function isSensitiveName(lower: string) {
   if (SENSITIVE_EXACT.has(lower)) return true
   const [svc, op = ''] = lower.split(':')
@@ -131,9 +99,7 @@ function isSensitiveName(lower: string) {
   return false
 }
 
-// Concrete names that isSensitiveName reports, used to test wildcard
-// patterns such as iam:*, iam:*Role, or s3:PutBucket*. A pattern that
-// matches none of them is not reported.
+// Probe names for matching wildcard patterns such as iam:*Role or s3:PutBucket*.
 const SENSITIVE_NAMES: string[] = [
   ...[...SENSITIVE_EXACT],
   ...[
@@ -179,11 +145,8 @@ const SENSITIVE_NAMES: string[] = [
   ].map(op => `kms:${op}`),
 ].map(a => a.toLowerCase())
 
-// The service rule from isSensitiveName applied to a wildcard pattern, for
-// names the list above doesn't have (such as kms:Rotate*). The service must
-// be written out: kms is always sensitive, and iam or organizations unless
-// the operation starts with a literal get, list, or describe before its
-// first wildcard. iam:G* is sensitive because it also covers Generate*.
+// kms is always sensitive; iam and organizations unless the literal prefix is get, list, or
+// describe. iam:G* counts because it also covers Generate*.
 function sensitiveByRule(lower: string): boolean {
   const colon = lower.indexOf(':')
   if (colon <= 0) return false
@@ -197,42 +160,32 @@ function sensitiveByRule(lower: string): boolean {
   return !/^(get|list|describe)/.test(literal)
 }
 
-// Whether an Action entry covers a sensitive action, and whether PassRole is
-// the only one it can cover (so PASSROLE_ANY_ROLE already says it all).
 function sensitiveCoverage(action: string): { sensitive: boolean; onlyPassRole: boolean } {
   const lower = action.toLowerCase()
   if (!/[*?]/.test(lower)) return { sensitive: isSensitiveName(lower), onlyPassRole: lower === 'iam:passrole' }
   const listed = SENSITIVE_NAMES.filter(name => wildcardMatch(lower, name))
-  // No other IAM action name starts with "Pass", so iam:Pass* or
-  // iam:PassRol? can only mean PassRole.
+  // No other IAM action starts with "Pass", so iam:Pass* can only mean PassRole.
   const onlyPassRole = listed.length > 0 && listed.every(n => n === 'iam:passrole') && lower.startsWith('iam:pass')
   return { sensitive: listed.length > 0 || sensitiveByRule(lower), onlyPassRole }
 }
 
 const coversPassRole = (action: string) => wildcardMatch(action, 'iam:PassRole', true)
 
-// Condition keys that limit who can call. A public principal is downgraded
-// only when one of these is checked with an operator that requires a match.
-// Keys such as aws:SecureTransport or aws:CurrentTime don't limit the caller.
+// Keys that limit who can call. aws:SecureTransport or aws:CurrentTime don't.
 const CALLER_KEYS = new Set([
   'aws:principalorgid', 'aws:principalorgpaths', 'aws:principalaccount', 'aws:principalarn',
   'aws:sourceaccount', 'aws:sourcearn', 'aws:sourceorgid', 'aws:sourceorgpaths',
   'aws:sourcevpce', 'aws:sourcevpc', 'aws:sourceip',
 ])
 
-// Not* operators match everything except the values, IfExists and
-// ForAllValues pass when the key is missing (as for anonymous callers), and
-// Null only checks presence, so none of them limit the caller.
+// Not* operators match everything except the values, IfExists and ForAllValues pass on a missing
+// key, and Null only checks presence, so none of these limit the caller.
 const LIMITING_OPERATOR = /^(ForAnyValue:)?(StringEquals|StringEqualsIgnoreCase|StringLike|ArnEquals|ArnLike|IpAddress)$/i
 
 const hasWildcard = (v: string) => v.includes('*') || v.includes('?')
 
-// A StringLike, ArnLike, or ArnEquals value with a wildcard limits the caller only if
-// what stays literal still pins it down. For an ARN, the partition,
-// service, and account must be literal, with a 12-digit account, so
-// "arn:*" or "arn:aws:iam::*:*" do not count; the Region and resource may
-// hold wildcards. Any other value may have wildcards only after its last
-// "/", with a literal part before it (o-exampleorgid/*, not o-* or */*).
+// A wildcard value limits the caller only if the literal part pins it down: an ARN needs a literal
+// partition, service, and 12-digit account; other values allow wildcards only after the last "/".
 function likeValueLimits(v: string): boolean {
   if (!hasWildcard(v)) return true
   const f = v.split(':')
@@ -245,15 +198,13 @@ function likeValueLimits(v: string): boolean {
   return slash > 0 && !hasWildcard(v.slice(0, slash))
 }
 
-// Four decimal octets, 0 to 255 each, or null.
 function ipv4Octets(v: string): number[] | null {
   const parts = v.split('.')
   if (parts.length !== 4 || !parts.every(p => /^\d{1,3}$/.test(p) && Number(p) <= 255)) return null
   return parts.map(Number)
 }
 
-// Eight 16-bit groups, or null. A trailing dotted quad (::ffff:192.0.2.1)
-// counts as the last two groups, and "::" stands for one or more zero groups.
+// Handles a trailing dotted quad (::ffff:192.0.2.1) and "::" for one or more zero groups.
 function ipv6Groups(v: string): number[] | null {
   let text = v.toLowerCase()
   const last = text.lastIndexOf(':')
@@ -273,12 +224,8 @@ function ipv6Groups(v: string): number[] | null {
   return [...left, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...right].map(g => parseInt(g, 16))
 }
 
-// An IpAddress value limits the caller only for a small enough range:
-// at least /8 for IPv4 and /16 for IPv6. IPv6 ranges inside ::/80 hold
-// IPv4-mapped (::ffff:0:0/96) and IPv4-compatible (::/96) addresses, so
-// they need at least /104, which is /8 of the embedded IPv4 address. No
-// prefix means one address. Anything that doesn't parse cleanly does not
-// count, so the finding stays High.
+// Limits the caller only at /8 or longer for IPv4 and /16 for IPv6, or /104 inside ::/80, which
+// holds IPv4-mapped addresses. Anything that does not parse keeps the finding High.
 function ipValueLimits(v: string): boolean {
   const slash = v.indexOf('/')
   const addr = slash === -1 ? v : v.slice(0, slash)
@@ -297,8 +244,7 @@ function ipValueLimits(v: string): boolean {
 }
 
 function valueLimits(operator: string, v: string): boolean {
-  // A policy variable such as ${aws:PrincipalOrgID} compares the caller with
-  // itself, which every caller passes.
+  // A policy variable compares the caller with itself, which every caller passes.
   if (!v || v.includes('${') || /^[*?]+$/.test(v)) return false
   if (/IpAddress$/i.test(operator)) return ipValueLimits(v)
   // ArnEquals takes wildcards in each ARN part, the same as ArnLike.
@@ -314,9 +260,7 @@ function callerLimits(st: ParsedStatement): string[] {
   return [...new Set(keys)]
 }
 
-// S3 actions that act on objects (need arn:aws:s3:::bucket/key) and on
-// buckets (need arn:aws:s3:::bucket). Common ones only; anything not listed
-// is not checked.
+// Common S3 object and bucket actions only; unlisted actions aren't checked.
 const S3_OBJECT_ACTIONS = new Set([
   'getobject', 'putobject', 'deleteobject', 'getobjectversion', 'deleteobjectversion',
   'getobjectacl', 'putobjectacl', 'getobjecttagging', 'putobjecttagging',
@@ -345,7 +289,6 @@ function isPublic(e: PrincipalEntry) {
   return e.value === '*' && (e.type === '*' || e.type === 'AWS' || e.type === '')
 }
 
-// Account ID from an AWS principal: a bare 12-digit ID, or an IAM/STS ARN.
 export function principalAccount(e: PrincipalEntry): string | null {
   if (e.type !== 'AWS' && e.type !== '') return null
   if (/^\d{12}$/.test(e.value)) return e.value
@@ -373,7 +316,6 @@ function s3ActionKind(action: string): 'bucket' | 'object' | null {
   return null
 }
 
-// Condition operators that behave differently from what people often expect.
 function conditionFindings(st: ParsedStatement, n: number): Finding[] {
   const out: Finding[] = []
   const at = { statement: n, sid: st.sid }
@@ -393,8 +335,7 @@ function conditionFindings(st: ParsedStatement, n: number): Finding[] {
         title: 'ForAnyValue Deny skips requests without the key',
         detail: `${c.operator} on ${c.key} is false when the request has no ${c.key}, so those requests are not denied. Add a Deny with "Null": {"${c.key}": "true"} if they should be.` })
     }
-    // Wildcards are literal in exact-match string operators. Policy variables
-    // such as ${aws:username} are not wildcards.
+    // Wildcards are literal in exact-match operators; ${...} variables are not wildcards.
     if (/^String(Not)?Equals(IgnoreCase)?$/i.test(base) &&
         c.values.some(v => /[*?]/.test(stripVariables(v)))) {
       out.push({ ...at, code: 'WILDCARD_IN_EXACT_MATCH', severity: 'medium',
@@ -414,11 +355,9 @@ function statementFindings(st: ParsedStatement, n: number, opts: AnalyzeOptions 
   const out: Finding[] = conditionFindings(st, n)
   const at = { statement: n, sid: st.sid }
   if (st.effect !== 'Allow') return out
-  // SCPs, RCPs, and permissions boundaries only cap permissions: an Allow in
-  // them grants nothing by itself, so "grants too much" checks don't apply.
+  // SCPs, RCPs, and boundaries only cap permissions, so "grants too much" checks don't apply.
   const guardrail = isGuardrail(opts.policyType)
 
-  // Principals (resource-based and trust policies)
   const principals = principalEntries(st.raw.Principal)
   if (st.notPrincipal) {
     out.push({ ...at, code: 'ALLOW_NOT_PRINCIPAL', severity: 'high',
@@ -447,7 +386,6 @@ function statementFindings(st: ParsedStatement, n: number, opts: AnalyzeOptions 
     }
   }
 
-  // Actions
   const allActions = st.actions.some(isAllActions)
   if (guardrail) {
     // skip grant checks
@@ -465,8 +403,7 @@ function statementFindings(st: ParsedStatement, n: number, opts: AnalyzeOptions 
         title: 'Allows all actions in a service',
         detail: `Allows every action in: ${list(wildServices.map(a => a.split(':')[0]))}.` })
     }
-    // iam:PassRole on any role gets its own, more specific finding below.
-    // Action "*" is already reported as ALL_ACTIONS.
+    // PassRole on any role and Action "*" have their own findings.
     const passRoleOnAny = anyRoleIn(st, opts.partitions)
     const sensitive = st.actions.filter(a => {
       if (isAllActions(a)) return false
@@ -480,7 +417,6 @@ function statementFindings(st: ParsedStatement, n: number, opts: AnalyzeOptions 
     }
   }
 
-  // Resources
   const anyResource = !st.notResource && st.resources.includes('*')
   if (guardrail) {
     // skip grant checks
@@ -499,7 +435,6 @@ function statementFindings(st: ParsedStatement, n: number, opts: AnalyzeOptions 
       detail: 'Resource "*" applies to every resource. Scope it to specific ARNs where the actions support it.' })
   }
 
-  // iam:PassRole on any role, including patterns such as iam:*, iam:P*, or *
   const passRole = !st.notAction && st.actions.some(coversPassRole)
   if (!guardrail && passRole && anyRoleIn(st, opts.partitions)) {
     const scopedToService = st.conditions.some(c => c.key.toLowerCase() === 'iam:passedtoservice')
@@ -511,7 +446,6 @@ function statementFindings(st: ParsedStatement, n: number, opts: AnalyzeOptions 
         : `Allows passing ${which} to any service, a common privilege escalation path. Scope Resource to specific role ARNs.` })
   }
 
-  // S3 action and ARN type mismatches
   if (!st.notAction && !st.notResource) {
     const s3Arns = st.resources.map(s3Resource).filter(Boolean)
     if (s3Arns.length) {
@@ -542,9 +476,7 @@ function policyFindings(parsed: ParsedPolicy, opts: AnalyzeOptions & { policyTyp
   const out: Finding[] = []
   const type = opts.policyType
 
-  // Required elements. Every statement needs Action or NotAction; identity
-  // policies and permissions boundaries also need Resource or NotResource
-  // (trust and many resource-based policies don't).
+  // Every statement needs Action or NotAction; identity policies and boundaries also need Resource or NotResource.
   parsed.statements.forEach((st, i) => {
     const at = { statement: i + 1, sid: st.sid }
     if (st.raw.Action === undefined && st.raw.NotAction === undefined) {
@@ -557,8 +489,7 @@ function policyFindings(parsed: ParsedPolicy, opts: AnalyzeOptions & { policyTyp
     }
   })
 
-  // Keys outside IAM's grammar: IAM rejects the policy, and this tool can't
-  // show what they were meant to say.
+  // IAM rejects keys outside its grammar.
   for (const u of parsed.unknownElements) {
     const where = u.statement ? `Statement ${u.statement} has` : 'The policy has'
     const hint = u.suggestion ? ` Did you mean "${u.suggestion}"?` : ''
@@ -567,8 +498,6 @@ function policyFindings(parsed: ParsedPolicy, opts: AnalyzeOptions & { policyTyp
       detail: `${where} "${u.key}", which is not a policy element, so IAM rejects the policy.${hint}` })
   }
 
-  // Principal must be absent from identity policies and boundaries, and
-  // present in resource-based and trust policies.
   const withPrincipal = parsed.statements.filter(s => s.raw.Principal !== undefined || s.raw.NotPrincipal !== undefined)
   if ((type === 'identity' || type === 'boundary') && withPrincipal.length) {
     out.push({ code: 'PRINCIPAL_NOT_ALLOWED', severity: 'medium', title: 'Principal in a policy that does not support it',
@@ -579,8 +508,7 @@ function policyFindings(parsed: ParsedPolicy, opts: AnalyzeOptions & { policyTyp
       detail: `Every statement in ${TYPE_NAMES[type]} needs a Principal or NotPrincipal (missing in ${parsed.statements.length - withPrincipal.length} statement(s)). Check the policy type.` })
   }
 
-  // Version: IAM accepts only 2012-10-17 and 2008-10-17, and treats a missing
-  // Version as 2008-10-17, where policy variables are plain text.
+  // IAM treats a missing Version as 2008-10-17, where policy variables are plain text.
   const usesVariables = parsed.statements.some(s => JSON.stringify(s.raw).includes('${'))
   if (parsed.version && parsed.version !== '2012-10-17' && parsed.version !== '2008-10-17') {
     out.push({ code: 'UNKNOWN_VERSION', severity: 'medium', title: 'Unsupported Version',
@@ -594,7 +522,6 @@ function policyFindings(parsed: ParsedPolicy, opts: AnalyzeOptions & { policyTyp
           detail: `${which}. Use Version 2012-10-17 to support policy variables and newer features.` })
   }
 
-  // Duplicate Sids
   const sids = parsed.statements.map(s => s.sid).filter((s): s is string => !!s)
   const dupes = [...new Set(sids.filter((s, i) => sids.indexOf(s) !== i))]
   if (dupes.length) {
@@ -602,14 +529,12 @@ function policyFindings(parsed: ParsedPolicy, opts: AnalyzeOptions & { policyTyp
       detail: `Sid values should be unique within a policy: ${list(dupes)}.` })
   }
 
-  // Size
   const size = sizeLimit(type)
   if (size && parsed.charCount > size.limit) {
     out.push({ code: 'OVER_SIZE_LIMIT', severity: 'medium', title: 'Over the size limit',
       detail: `${parsed.charCount.toLocaleString('en-US')} characters as compact JSON, over the ${size.label} of ${size.limit.toLocaleString('en-US')}.` })
   }
 
-  // Accounts referenced, when the user hasn't said which account is theirs
   if (!opts.accountId) {
     const accounts = new Set<string>()
     for (const st of parsed.statements) {
@@ -639,7 +564,6 @@ export function analyzePolicy(parsed: ParsedPolicy, opts: AnalyzeOptions = {}): 
     (a.statement ?? Infinity) - (b.statement ?? Infinity))
 }
 
-// Who a statement applies to, in plain English.
 export function describeSubject(st: ParsedStatement): string {
   if (st.notPrincipal) return `Everyone except ${list(st.principals)}`
   const principals = principalEntries(st.raw.Principal)

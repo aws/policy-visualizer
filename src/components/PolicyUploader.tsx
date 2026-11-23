@@ -7,8 +7,7 @@ import { describeParseError, InputTooLargeError, NoPolicyFoundError } from '../p
 import { loadPolicyText, MAX_INPUT_CHARS } from '../policy/input'
 import type { ParsedPolicy } from '../policy/types'
 
-// While `redacted` is on, the pasted text and where the policy was found
-// (which can include CloudFormation resource names) are hidden.
+// While redacting, hide the pasted text and where the policy was found (it can name CloudFormation resources).
 export default function PolicyUploader({ onParsed, redacted = false }: { onParsed: (p: ParsedPolicy|null)=>void; redacted?: boolean }) {
   const [text, setText] = useState('')
   const [error, setError] = useState<string|null>(null)
@@ -37,8 +36,7 @@ export default function PolicyUploader({ onParsed, redacted = false }: { onParse
         : null)
       onParsed(parsed)
     } catch (e: unknown) {
-      // Bad JSON and invalid policies are user input mistakes, shown in the
-      // UI. Only log errors that aren't one of those.
+      // Bad JSON and invalid policies are shown in the UI; log only unexpected errors.
       setSource(null)
       if (!(e instanceof SyntaxError) && !(e instanceof ZodError) && !(e instanceof NoPolicyFoundError) && !(e instanceof InputTooLargeError)) console.error(e)
       setError(describeParseError(e))
@@ -48,8 +46,7 @@ export default function PolicyUploader({ onParsed, redacted = false }: { onParse
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    // Reset so choosing the same file again (after editing it, or after
-    // Clear) fires onChange again.
+    // Reset so choosing the same file again fires onChange.
     e.target.value = ''
     if (!file) return
     // Check the size before reading, so a huge file is never loaded.
@@ -75,9 +72,7 @@ export default function PolicyUploader({ onParsed, redacted = false }: { onParse
     try{
       setLoading(true);
       setError(null);
-      // Load the bundled sample from a path relative to the app's base URL,
-      // so it resolves whether the app runs at the root, in a subfolder, or
-      // on GitHub Pages.
+      // Relative to the base URL, so it loads at the root, in a subfolder, or on GitHub Pages.
       const url = `${import.meta.env.BASE_URL}sample-policy.json`;
       const res = await fetch(url);
       if (!res.ok) throw new Error(`Could not load sample policy (HTTP ${res.status})`);

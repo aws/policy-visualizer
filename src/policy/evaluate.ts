@@ -3,12 +3,8 @@
 
 import type { ParsedPolicy, ParsedStatement, Statement } from './types'
 
-// Answer "does this one policy allow this request?" by matching the action,
-// resource, and principal against each statement, with an explicit Deny
-// winning over any Allow. It does NOT evaluate conditions (it reports that
-// they apply), other policies (identity, resource, SCPs, RCPs, boundaries,
-// session policies), or service-specific rules. It is a reading aid, not an
-// authorization decision.
+// A reading aid, not an authorization decision: it matches action, resource, and principal with
+// Deny winning, but doesn't evaluate conditions, other policies, or service-specific rules.
 
 export interface AccessRequest {
   action: string
@@ -23,8 +19,7 @@ export interface StatementMatch {
   sid?: string
   effect: 'Allow' | 'Deny'
   match: Match
-  // True when the statement applies only for some requests: it has
-  // conditions, or its Resource match depends on a policy variable.
+  // Conditions, or a Resource match that depends on a policy variable.
   conditional: boolean
   variables: boolean
   // For match 'unknown': what the request didn't say that this statement needs.
@@ -40,11 +35,8 @@ export interface AccessResult {
   matches: StatementMatch[]
 }
 
-// IAM-style wildcard match: "*" matches any run of characters, "?" exactly
-// one. Two pointers that remember the last "*", so the cost is at most
-// pattern length x text length. A regex built from the pattern (".*" per
-// "*") can backtrack exponentially on patterns like "*a*a*a...b", which
-// would let a crafted policy freeze the page.
+// Two pointers, not a regex: a regex built from the pattern can backtrack exponentially on
+// "*a*a*a...b" and freeze the page.
 export function wildcardMatch(pattern: string, text: string, ignoreCase = false): boolean {
   const p = ignoreCase ? pattern.toLowerCase() : pattern
   const t = ignoreCase ? text.toLowerCase() : text
@@ -68,12 +60,10 @@ export function wildcardMatch(pattern: string, text: string, ignoreCase = false)
 
 const actionMatches = (pattern: string, action: string) => wildcardMatch(pattern, action, true)
 
-// A Resource pattern as a list of literal characters and wildcards, so an
-// escaped "*" can be told apart from a real one.
+// Compiled so an escaped "*" can be told apart from a wildcard.
 const STAR = 0, ONE = 1
 type Glob = (string | typeof STAR | typeof ONE)[]
 
-// Same two-pointer matcher as wildcardMatch, over a compiled pattern.
 function globMatch(p: Glob, t: string): boolean {
   let pi = 0, ti = 0, star = -1, mark = 0
   while (ti < t.length) {
@@ -93,17 +83,12 @@ function globMatch(p: Glob, t: string): boolean {
   return pi === p.length
 }
 
-// "*" and "?" are wildcards. With variables on (Version 2012-10-17),
-// ${*}, ${?}, and ${$} are IAM's escapes for those literal characters, and
-// any other ${...} is a policy variable whose value comes from the request,
-// so it is matched as "*" and reported. With variables off, ${...} is plain
-// text and only "literalBraces" decides whether a "*" or "?" inside it is a
-// wildcard.
+// With Version 2012-10-17, ${*} ${?} ${$} are escapes and any other ${...} matches as "*".
+// Without it, ${...} is plain text.
 function compileResource(pattern: string, variables: boolean, literalBraces = false): { glob: Glob; usesVariable: boolean } {
   const glob: Glob = []
   let usesVariable = false
-  // The next "}", or -1 once none follows, so many "${" without a "}" cost
-  // one search in total instead of one each.
+  // Cached, so many "${" without a "}" cost one search in total.
   let close = -2
   for (let i = 0; i < pattern.length;) {
     let end = -1
@@ -127,8 +112,7 @@ function compileResource(pattern: string, variables: boolean, literalBraces = fa
   return { glob, usesVariable }
 }
 
-// The text with every ${...} removed, as a linear scan (a regex such as
-// /\$\{[^}]*\}/g rescans to the end for each unclosed "${").
+// A linear scan; a regex such as /\$\{[^}]*\}/g rescans to the end for each unclosed "${".
 export function stripVariables(text: string): string {
   let out = ''
   let start = 0
@@ -143,8 +127,7 @@ export function stripVariables(text: string): string {
   return out + text.slice(start)
 }
 
-// 'maybe' means it matches only for some requests: a policy variable has to
-// resolve to a value that fits.
+// 'maybe': matches only if a policy variable resolves to a value that fits.
 type ResourceMatch = 'yes' | 'no' | 'maybe'
 
 function resourceMatches(pattern: string, resource: string, variables: boolean): ResourceMatch {
@@ -154,9 +137,7 @@ function resourceMatches(pattern: string, resource: string, variables: boolean):
     if (!globMatch(glob, resource)) return 'no'
     return usesVariable ? 'maybe' : 'yes'
   }
-  // Without Version 2012-10-17, ${...} is plain text. Whether a "*" or "?"
-  // inside it is still a wildcard is not certain, so a match that needs it
-  // to be one is only a 'maybe'.
+  // Without 2012-10-17, a wildcard inside ${...} may be literal, so such a match is only 'maybe'.
   if (globMatch(compileResource(pattern, false, true).glob, resource)) return 'yes'
   return globMatch(compileResource(pattern, false).glob, resource) ? 'maybe' : 'no'
 }
@@ -174,9 +155,7 @@ function entries(p: Statement['Principal']): Entry[] {
   return Object.entries(p).flatMap(([type, v]) => (Array.isArray(v) ? v : [v]).map(value => ({ type, value })))
 }
 
-// Is the caller a session of this role? A role session ARN,
-// arn:aws:sts::111122223333:assumed-role/<role-name>/<session-name>, has the
-// role's partition, account, and name, but not its path.
+// A session ARN has the role's partition, account, and name, but not its path.
 function isSessionOf(roleArn: string, caller: string): boolean {
   const role = /^arn:(aws[a-z-]*):iam::(\d{12}):role\//.exec(roleArn)
   const session = /^arn:(aws[a-z-]*):sts::(\d{12}):assumed-role\/([^/]+)\/[^/]+$/.exec(caller)
@@ -185,12 +164,8 @@ function isSessionOf(roleArn: string, caller: string): boolean {
   return role[1] === session[1] && role[2] === session[2] && name === session[3]
 }
 
-// Does the caller match one principal entry? Account principals
-// (111122223333 or arn:aws:iam::111122223333:root) match any principal in
-// that account, which then also needs its own identity policy to allow it.
-// A role ARN in Principal matches the sessions of that role. In NotPrincipal
-// that is not certain: IAM may check the account, the role, and the session
-// in turn, so a role session against a role ARN there is 'unknown'.
+// Account principals match any principal in that account. In NotPrincipal, IAM may check the
+// account, role, and session in turn, so a session against a role ARN is 'unknown'.
 function principalMatches(e: Entry, caller: string, notes: string[], inNotPrincipal = false): Match {
   if (e.value === '*') return 'yes'
   if (e.type === 'Service' || e.type === 'Federated' || e.type === 'CanonicalUser') return e.value.toLowerCase() === caller.toLowerCase() ? 'yes' : 'no'
@@ -221,8 +196,7 @@ function matchStatement(st: ParsedStatement, n: number, req: AccessRequest, vari
     if (req.resource) {
       const hits = st.resources.map(r => resourceMatches(r, req.resource as string, variables))
       const hit = hits.includes('yes')
-      // A 'maybe' match makes Resource apply for some requests, and so
-      // NotResource not apply for those same requests.
+      // A 'maybe' Resource match means NotResource doesn't apply to those requests.
       const maybe = !hit && hits.includes('maybe')
       if (st.notResource ? hit : !hit && !maybe) match = 'no'
       else if (maybe) {
@@ -280,8 +254,7 @@ export function evaluateAccess(parsed: ParsedPolicy, req: AccessRequest): Access
   const unknown = matches.filter(m => m.match === 'unknown')
 
   if (denyHard) return { decision: 'explicit-deny', summary: `Explicitly denied by ${label(denyHard)}.`, matches }
-  // A Deny that might still apply (conditions, a policy variable, or a
-  // principal we couldn't check) qualifies any Allow answer.
+  // A Deny that might apply qualifies any Allow answer.
   const maybeDeny = [...denySoft, ...unknown.filter(m => m.effect === 'Deny')]
   const unless = maybeDeny.length ? ` unless ${maybeDeny.map(label).join(', ')} denies it` : ''
   if (allowHard) {
@@ -294,8 +267,7 @@ export function evaluateAccess(parsed: ParsedPolicy, req: AccessRequest): Access
       : `the ${conds ? 'conditions and policy variables' : 'policy variables'} in ${names} match the request`
     return { decision: 'conditional', summary: `Allowed only if ${what}${unless}.`, matches }
   }
-  // Only an unresolved Allow can make the answer "it depends". An unresolved
-  // Deny with no Allow still leaves the request implicitly denied.
+  // An unresolved Deny with no Allow is still an implicit deny.
   const unknownAllow = unknown.filter(m => m.effect === 'Allow')
   if (unknownAllow.length) {
     const byResource = unknownAllow.filter(m => m.needs.includes('resource'))

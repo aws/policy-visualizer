@@ -43,7 +43,6 @@ function injectCsp(): Plugin {
   };
 }
 
-// https://vitejs.dev/config/
 // Base path is configurable so the app can run from the root ("/"), a
 // subfolder, or GitHub Pages. Set VITE_BASE at build time to override.
 // Default "./" produces relative asset paths that work from any location.
@@ -59,7 +58,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./tests/setup.ts"],
-    globals: true, // disable to explicitly import vitest exports in test files
+    globals: true,
     // Browser tests in e2e/ run under Playwright (npm run test:e2e), not vitest.
     exclude: [...configDefaults.exclude, "e2e/**"],
   },
