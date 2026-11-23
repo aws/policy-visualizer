@@ -16,10 +16,7 @@ export default function App() {
   const [exportError, setExportError] = useState<string | null>(null)
   const [redact, setRedact] = useState(false)
 
-  // Redacted copy for everything shown: diagram (and so PNG/PDF exports),
-  // statement list, analysis, and tables. The same Redactor is passed on so
-  // findings text and copied Markdown use the same placeholders. Analysis
-  // and the Optimize download still use the real policy.
+  // Display uses the redacted copy; analysis and the Optimize download use the real policy.
   const redaction = useMemo(() => {
     if (!parsed || !redact) return null
     const redactor = new Redactor()

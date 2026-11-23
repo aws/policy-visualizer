@@ -18,11 +18,8 @@ const DECISION_COLOR: Record<Decision, string> = {
 const input = { display: 'block', width: '100%', boxSizing: 'border-box' as const, marginTop: '4px', padding: '5px 6px', background: '#0a1430', color: '#eaeef7', border: '1px solid #4a5568', borderRadius: '4px', fontSize: '13px' }
 const labelStyle = { display: 'block', fontSize: '12px', color: '#9aa7c3', marginBottom: '8px' }
 
-// "Does this policy allow X?" for this one policy only.
-// While redacting, the resource and caller fields are masked like the
-// account ID field, since what is typed there is not redacted.
-// "new-password" tells browsers not to fill in a saved password, which they
-// may still do for a masked field marked "off".
+// Typed fields are masked while redacting, since their text is not redacted.
+// autoComplete "new-password" stops browsers filling a saved password into a masked field.
 export default function CheckAccessTab({ parsed, policyType, tx = t => t, redacted = false }: { parsed: ParsedPolicy; policyType: PolicyType; tx?: (t: string) => string; redacted?: boolean }) {
   const [action, setAction] = useState('')
   const [resource, setResource] = useState('')

@@ -5,13 +5,8 @@ import type { ParsedPolicy, ParsedStatement } from './types'
 import type { Finding } from './findings'
 import { STATEMENT_ELEMENTS } from './parse'
 
-// Compare two versions of a policy statement by statement and element by
-// element: which statements, actions, resources, principals, and conditions
-// were added or removed, per effect. The element lists pool every
-// statement, so a change that only moves an action, principal, or condition
-// to another statement shows up in the statement list. This shows what
-// changed in the text; it does not evaluate effective permissions (a new
-// wildcard can make an existing entry redundant, for example).
+// Element lists pool every statement, so a value that moves between statements shows up in the
+// statement list. This compares text, not effective permissions.
 
 export interface ElementDiff {
   added: string[]
@@ -19,8 +14,7 @@ export interface ElementDiff {
 }
 
 export interface PolicyDiff {
-  // Statements that are not in the other version, ignoring Sid, statement
-  // order, and the order of values within an element.
+  // Ignores Sid, statement order, and value order within an element.
   statements: ElementDiff
   allowActions: ElementDiff
   denyActions: ElementDiff
@@ -53,14 +47,10 @@ const conditionsOf = (s: ParsedStatement) => s.conditions.map(c => `${s.effect} 
 
 const sorted = (values: string[]) => [...new Set(values)].sort()
 
-// Which of the two elements a statement uses, if any.
 const element = (st: ParsedStatement, name: 'Action' | 'Resource' | 'Principal') =>
   st.raw[name] !== undefined ? name : st.raw[`Not${name}`] !== undefined ? `Not${name}` : ''
 
-// Everything a statement says except its Sid, as a string that is the same
-// for two statements exactly when they say the same thing. Values are
-// sorted, so their order doesn't matter. Elements outside IAM's grammar are
-// included as written.
+// Values are sorted, so order doesn't matter; elements outside IAM's grammar are kept as written.
 function statementKey(st: ParsedStatement): string {
   const conditions = sorted(st.conditions.map(c => JSON.stringify([c.operator, c.key, sorted(c.values)])))
   const unknown = Object.keys(st.raw).filter(k => !STATEMENT_ELEMENTS.includes(k)).sort()
@@ -72,8 +62,7 @@ function statementKey(st: ParsedStatement): string {
     conditions, unknown])
 }
 
-// A statement in plain text for the list of changed statements. Values are
-// written as they appear in the policy so that redaction finds them.
+// Values as written in the policy, so redaction finds them.
 function statementLabel(st: ParsedStatement): string {
   const parts: string[] = [st.effect]
   const add = (name: string, values: string[]) => { if (name) parts.push(`${name}: ${sorted(values).join(', ')}`) }
@@ -85,8 +74,6 @@ function statementLabel(st: ParsedStatement): string {
   return parts.join('; ')
 }
 
-// Statements of `from` with no identical statement left in `to`, counting
-// duplicates.
 function unmatched(from: ParsedStatement[], to: ParsedStatement[]): string[] {
   const left = new Map<string, number>()
   for (const st of to) { const k = statementKey(st); left.set(k, (left.get(k) ?? 0) + 1) }
@@ -100,9 +87,7 @@ function unmatched(from: ParsedStatement[], to: ParsedStatement[]): string[] {
   return sorted(out)
 }
 
-// Findings match on what they say and on the statement they are about, by
-// its content rather than its number, so reordering statements doesn't show
-// up as a change but a finding that moves to another statement does.
+// Findings match by statement content, not number, so reordering alone isn't a change.
 function findingKeys(p: ParsedPolicy) {
   const keys = p.statements.map(statementKey)
   return (f: Finding) => JSON.stringify([f.code, f.detail, f.statement ? keys[f.statement - 1] ?? f.statement : ''])

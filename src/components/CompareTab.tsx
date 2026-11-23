@@ -24,12 +24,9 @@ function DiffRows({ title, diff, tx }: { title: string; diff: ElementDiff; tx: (
   )
 }
 
-// The statement number tells apart the same finding on different statements.
 const findingText = (f: Finding) =>
   `${f.statement ? `Statement ${f.statement}: ` : ''}${f.severity.toUpperCase()}: ${f.title}. ${f.detail}`
 
-// Paste the previous version of the policy to see what the loaded one adds
-// or removes.
 export default function CompareTab({ after, options, redactor }: { after: ParsedPolicy; options: AnalyzeOptions; redactor?: Redactor | null }) {
   const [text, setText] = useState('')
   const [before, setBefore] = useState<ParsedPolicy | null>(null)
@@ -39,8 +36,7 @@ export default function CompareTab({ after, options, redactor }: { after: Parsed
     ? diffPolicies(before, after, analyzePolicy(before, options), analyzePolicy(after, options))
     : null, [before, after, options])
 
-  // When redacting, register the earlier version's values too, so both
-  // versions map to the same placeholders.
+  // Register the earlier version's values too, so both versions share placeholders.
   const tx = useMemo(() => {
     if (!redactor) return (t: string) => t
     if (before) redactPolicy(before, redactor)

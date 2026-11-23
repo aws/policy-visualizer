@@ -53,7 +53,6 @@ function FindingsList({ findings, tx }: { findings: Finding[]; tx: (t: string) =
   )
 }
 
-// Service icons mapping for visual identification
 const serviceIcons: Record<string, string> = {
   's3': '🪣', 'ec2': '🖥️', 'lambda': 'λ', 'iam': '👤', 'rds': '🗄️', 'cloudformation': '📚',
   'sns': '📢', 'sqs': '📬', 'dynamodb': '⚡', 'cloudwatch': '📊', 'kms': '🔐', 'sts': '🎫'
@@ -64,9 +63,7 @@ function getServiceIcon(action: string): string {
   return serviceIcons[service] || '⚙️'
 }
 
-// Plain-English rendering of a statement. All policy-derived values (actions,
-// resources, condition values) are rendered as React text nodes, never as
-// HTML, so a hostile pasted policy cannot inject markup or script.
+// Policy values render as React text nodes, never HTML, so a pasted policy can't inject markup.
 function ActionDescription({ action }: { action: string }) {
   const parts = action.split(':')
   if (parts.length !== 2) return <>{action}</>
@@ -114,9 +111,7 @@ function TranslatedStatement({ statement }: { statement: ParsedStatement }) {
   )
 }
 
-// Analysis always runs on the real policy. When redacting, `displayParsed`
-// is the redacted copy used for anything shown, and `redactor` maps the
-// remaining text (findings, table rows, results) to the same placeholders.
+// Analysis runs on the real policy; displayParsed and redactor are for what is shown.
 export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
   parsed: ParsedPolicy | null
   displayParsed?: ParsedPolicy | null
@@ -128,8 +123,7 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
   const [isExpanded, setIsExpanded] = useState(false)
   const [accountId, setAccountId] = useState('')
   const accountValid = /^\d{12}$/.test(accountId)
-  // 'auto' follows detectPolicyType; picking a type overrides it until the
-  // next policy is loaded.
+  // 'auto' follows detectPolicyType; a picked type holds until the next policy loads.
   const [typeChoice, setTypeChoice] = useState<PolicyType | 'auto'>('auto')
   const [copyStatus, setCopyStatus] = useState<string | null>(null)
   const [copyFallback, setCopyFallback] = useState<string | null>(null)
@@ -150,8 +144,7 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
     const deny = total - allow
     let wildActions = 0, wildResources = 0, noConditions = 0
     for (const s of parsed.statements) {
-      // A wildcard inside NotAction/NotResource narrows the exception, so it
-      // is not a wildcard grant.
+      // A wildcard in NotAction/NotResource narrows the exception, so it is not a wildcard grant.
       if (!s.notAction && hasWildcard(s.actions)) wildActions++
       if (!s.notResource && hasWildcard(s.resources)) wildResources++
       if (!s.conditions.length) noConditions++
@@ -182,8 +175,7 @@ export default function PolicyAnalysis({ parsed, displayParsed, redactor }: {
     }
   }
 
-  // Generate permission rows for the optimization table. Only the rows the
-  // table shows are built; the total is counted separately.
+  // Only the rows the table shows are built; the total is counted separately.
   useEffect(() => {
     setPermissions(parsed ? buildPermissionRows(parsed) : [])
   }, [parsed])

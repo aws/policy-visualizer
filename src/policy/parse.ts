@@ -5,8 +5,7 @@ import { z } from 'zod'
 import type { ConditionValue, PolicyDocument, ParsedPolicy, ParsedStatement } from './types'
 
 const StrOrArr = z.union([z.string(), z.array(z.string())]).optional()
-// IAM accepts strings, numbers, and booleans as condition values, e.g.
-// "Bool": { "aws:SecureTransport": false }.
+// IAM accepts numbers and booleans as condition values, e.g. "aws:SecureTransport": false.
 const ConditionScalar = z.union([z.string(), z.number(), z.boolean()])
 const ConditionSchema = z
   .record(z.string(), z.record(z.string(), z.union([ConditionScalar, z.array(ConditionScalar)])))
@@ -19,8 +18,7 @@ const PrincipalSchema = z
   ])
   .optional()
 
-// Loose objects keep elements the schema doesn't know, so a typo such as
-// "Actions" can be reported instead of silently dropped.
+// Loose, so a typo such as "Actions" can be reported instead of dropped.
 const StatementSchema = z.looseObject({
   Sid: z.string().optional(),
   Effect: z.union([z.literal('Allow'), z.literal('Deny')]),
@@ -39,12 +37,9 @@ const PolicySchema = z.looseObject({
   Statement: z.union([StatementSchema, z.array(StatementSchema)])
 })
 
-// The elements IAM's policy grammar defines.
 export const POLICY_ELEMENTS = ['Version', 'Id', 'Statement']
 export const STATEMENT_ELEMENTS = ['Sid', 'Effect', 'Principal', 'NotPrincipal', 'Action', 'NotAction', 'Resource', 'NotResource', 'Condition']
 
-// The element a misspelled key most likely meant: same name ignoring case,
-// or the same name with a trailing "s" (Actions, Resources).
 function suggestElement(key: string, known: string[]): string | undefined {
   const k = key.toLowerCase()
   return known.find(e => e.toLowerCase() === k || `${e.toLowerCase()}s` === k)
@@ -87,7 +82,6 @@ function parsePrincipal(p?: PrincipalValue): string[] {
   return out
 }
 
-// Valid JSON with no policy document anywhere in it.
 export class NoPolicyFoundError extends Error {
   constructor() {
     super('No policy document found. Expected an object with a "Statement" element, or AWS CLI or CloudFormation output that contains one.')
@@ -95,7 +89,6 @@ export class NoPolicyFoundError extends Error {
   }
 }
 
-// Input or policy over the size limits in input.ts.
 export class InputTooLargeError extends Error {
   constructor(message: string) {
     super(message)
@@ -103,7 +96,6 @@ export class InputTooLargeError extends Error {
   }
 }
 
-// A "__proto__" key where the schema would drop it without a trace.
 export class UnreadableKeyError extends Error {
   constructor(statement: number, element: string) {
     super(`Statement ${statement} has a "__proto__" key in ${element}. This tool can't read that key, so it does not analyze the policy.`)
@@ -113,12 +105,8 @@ export class UnreadableKeyError extends Error {
 
 const hasOwn = (o: unknown, k: string) => !!o && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k)
 
-// JSON.parse keeps a "__proto__" key as an ordinary property, but schema
-// validation drops it. As a policy or statement element it is reported as
-// an unknown element (IAM rejects the policy). Inside Condition, Principal,
-// or NotPrincipal, dropping it would change what the statement means (a
-// Deny could lose a condition and look unconditional), so the policy is
-// rejected instead.
+// Schema validation drops "__proto__" keys. Inside Condition or Principal that could change the
+// meaning (a Deny losing its condition), so the policy is rejected; elsewhere it is reported.
 function rejectNestedProto(input: unknown) {
   if (!input || typeof input !== 'object') return
   const st = (input as Record<string, unknown>).Statement
@@ -134,8 +122,6 @@ function rejectNestedProto(input: unknown) {
   })
 }
 
-// One readable line for a failed parse: bad JSON, or JSON that is not a
-// valid policy (reported with the path of the first problem).
 export function describeParseError(e: unknown): string {
   if (e instanceof SyntaxError) return `Invalid JSON: ${e.message}`
   if (e instanceof NoPolicyFoundError || e instanceof InputTooLargeError || e instanceof UnreadableKeyError) return e.message
@@ -155,8 +141,7 @@ export function parsePolicy(input: unknown): ParsedPolicy {
   const data = PolicySchema.parse(input) as PolicyDocument
   rejectNestedProto(input)
   const stmts = Array.isArray(data.Statement) ? data.Statement : [data.Statement]
-  // Keys are listed from the input, not the validated copy, which has lost
-  // any "__proto__" key.
+  // From the input, since the validated copy has lost any "__proto__" key.
   const source = input as Record<string, unknown>
   const sourceStmts = (Array.isArray(source.Statement) ? source.Statement : [source.Statement]) as Record<string, unknown>[]
 
@@ -191,8 +176,7 @@ export function parsePolicy(input: unknown): ParsedPolicy {
     policyId: data.Id,
     unknownElements: unknown,
     statements: parsed,
-    // Compact JSON: no white space between tokens, but spaces inside string
-    // values are kept, so the count never comes out below IAM's.
+    // Compact JSON that keeps spaces inside strings, so the count never comes out below IAM's.
     charCount: JSON.stringify(input).length
   }
 }

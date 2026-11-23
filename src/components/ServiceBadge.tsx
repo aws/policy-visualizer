@@ -3,10 +3,6 @@
 
 import { getServicePrefix, serviceColor } from '../utils/serviceIcons'
 
-// Small rounded-rectangle text badge showing an AWS service prefix
-// (e.g. "s3", "iam"). The background color is deterministic per service.
-// This replaces the previous AWS service icon images, so no proprietary
-// icon assets are bundled or redistributed.
 export default function ServiceBadge({
   value,
   prefix,

@@ -10,10 +10,7 @@ const EXPORT_PIXEL_RATIO = 2
 const EXPORT_BACKGROUND = '#e0f2fe'
 const PDF_JPEG_QUALITY = 0.85
 
-// Build an off-screen copy of the diagram sized to the full graph bounds,
-// with pan/zoom reset, so exports always capture the whole diagram no matter
-// how the on-screen view is panned or zoomed. The Graph component publishes
-// the graph bounds as data attributes on its <svg> element.
+// Export from an off-screen copy at full graph size, so pan and zoom don't affect it.
 function cloneFullGraph(container: HTMLElement) {
   const svg = container.querySelector('svg[data-graph-width]') as SVGSVGElement | null
   if (!svg) return null
@@ -38,11 +35,8 @@ function cloneFullGraph(container: HTMLElement) {
   clone.style.width = `${width}px`
   clone.style.height = `${height}px`
 
-  // The captured node must carry no off-screen positioning: html-to-image
-  // copies its computed styles into the rendered clone, so a fixed/-100000px
-  // position on the captured node itself would draw the content off-canvas
-  // and produce a blank export. Keep the positioning on a separate carrier
-  // element and capture the statically positioned wrapper inside it.
+  // html-to-image copies computed styles, so off-screen positioning on the captured node would
+  // export blank. It goes on a separate carrier element instead.
   const wrapper = document.createElement('div')
   wrapper.style.width = `${width}px`
   wrapper.style.height = `${height}px`
@@ -70,7 +64,6 @@ export function download(href: string, fileName: string) {
   document.body.removeChild(link)
 }
 
-// Both exporters throw on failure so the caller can tell the user.
 export async function exportElementAsPNG(el: HTMLElement, fileName = 'policy-visualizer.png') {
   const full = cloneFullGraph(el)
   if (!full) throw new Error('There is no diagram to export.')
@@ -91,8 +84,7 @@ export async function exportElementAsPDF(el: HTMLElement, fileName = 'policy-vis
   const full = cloneFullGraph(el)
   if (!full) throw new Error('There is no diagram to export.')
   try {
-    // JPEG keeps the embedded image small; the diagram background is a solid
-    // color, so quality loss is minimal. `compress: true` deflates PDF streams.
+    // JPEG keeps the image small; the background is a solid color, so quality loss is minimal.
     const dataUrl = await toJpeg(full.wrapper, {
       pixelRatio: safePixelRatio(full.width, full.height, EXPORT_PIXEL_RATIO),
       backgroundColor: EXPORT_BACKGROUND,

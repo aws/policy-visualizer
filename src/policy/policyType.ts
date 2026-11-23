@@ -3,9 +3,7 @@
 
 import type { ParsedPolicy } from './types'
 
-// Which kind of policy this is changes which findings make sense: an SCP's
-// Allow "*" is the normal default, while the same statement in an identity
-// policy grants full access.
+// An SCP's Allow "*" is the normal default; in an identity policy it grants full access.
 export type PolicyType = 'identity' | 'resource' | 'trust' | 'scp' | 'boundary'
 
 export const POLICY_TYPES: { value: PolicyType; label: string }[] = [
@@ -16,15 +14,10 @@ export const POLICY_TYPES: { value: PolicyType; label: string }[] = [
   { value: 'boundary', label: 'Permissions boundary' },
 ]
 
-// Policy types that only set a maximum and never grant access on their own.
 export function isGuardrail(t: PolicyType) {
   return t === 'scp' || t === 'boundary'
 }
 
-// Shown with the findings while a guardrail type is in use, since the list
-// is otherwise silently shorter. `detected` is true when the type came from
-// detectPolicyType rather than the user's choice; only the input wrapper
-// detects a guardrail type.
 export function guardrailNotice(t: PolicyType, detected: boolean): string | null {
   if (!isGuardrail(t)) return null
   const name = t === 'scp' ? 'an SCP or RCP' : 'a permissions boundary'
@@ -36,20 +29,8 @@ export function guardrailNotice(t: PolicyType, detected: boolean): string | null
 
 const ASSUME_ACTIONS = /^sts:(assumerole|assumerolewithsaml|assumerolewithwebidentity|tagsession|setsourceidentity|setcontext)$/i
 
-// Best guess from the input wrapper and the policy contents. Organizations
-// SCPs look like identity policies, so they are only detected from the
-// wrapper. Guardrail types turn off the "grants too much" checks, so the
-// wrapper must match exactly, by whole keys at fixed places: a key name
-// that merely contains a word (a CloudFormation logical ID such as
-// AppRoleWithoutPermissionsBoundary) decides nothing.
-// - AssumeRolePolicyDocument as the key that holds the policy (get-role,
-//   list-roles, CloudFormation AWS::IAM::Role) is a trust policy.
-// - Policy.Content at the top of the input (organizations describe-policy)
-//   is an SCP or RCP.
-// Permissions boundaries are never detected: AWS output names a boundary by
-// its ARN (PermissionsBoundaryArn) and never holds its document under a
-// PermissionsBoundary key. Anything else is judged by its contents, and the
-// user can pick the type.
+// SCPs look like identity policies, so they are detected only from exact wrapper keys, never a
+// substring of a name. Boundaries are never detected: AWS output names them only by ARN.
 export function detectPolicyType(parsed: ParsedPolicy): PolicyType {
   const keys = parsed.sourceKeys ?? []
   if (keys[keys.length - 1] === 'AssumeRolePolicyDocument') return 'trust'
